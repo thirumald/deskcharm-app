@@ -1,0 +1,1144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Smart Speed Breaker Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Operations-console look: dark control-room UI around a hi-res road view. */
+:root{
+  --bg:#0b1013; --panel:#131a1e; --panel2:#192227; --line:#26323a; --line2:#32424c;
+  --fg:#e4ecef; --muted:#8c9ca5;
+  --amber:#f2b632; --teal:#38c6b2; --red:#ff5d52; --blue:#5b93ff; --ok:#4fd18b;
+  --display:"Barlow Condensed","Arial Narrow",sans-serif;
+  --body:"IBM Plex Sans",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 var(--body)}
+button,select,input{font:inherit;color:inherit}
+.app{max-width:1600px;margin:0 auto;padding:0 max(16px,env(safe-area-inset-right)) 32px max(16px,env(safe-area-inset-left))}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 22px;padding:14px 0 10px}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{flex:none}
+.brand b{display:block;font:700 22px/1 var(--display);letter-spacing:.06em;text-transform:uppercase}
+.brand span{font-size:12px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+.status{display:flex;flex-wrap:wrap;gap:6px;flex:1}
+.spill{display:inline-flex;align-items:center;gap:7px;padding:3px 10px;border:1px solid var(--line);border-radius:14px;background:var(--panel);font-size:12px;white-space:nowrap}
+.spill i{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 6px currentColor;color:var(--ok)}
+.spill.warn i{background:var(--amber);color:var(--amber)}.spill.bad i{background:var(--red);color:var(--red)}
+.clock{font:500 13px var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.nav{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line);margin-bottom:14px;scrollbar-width:thin}
+.nav button{flex:none;background:none;border:0;border-bottom:3px solid transparent;color:var(--muted);padding:9px 14px;font:600 16px var(--display);letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
+.nav button:hover{color:var(--fg)}
+.nav button[aria-selected=true]{color:var(--amber);border-bottom-color:var(--amber)}
+.nav .badge{margin-left:6px;font:500 11px var(--mono);background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:0 6px;color:var(--muted)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.view[hidden]{display:none}
+.opsgrid{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:14px;align-items:start}
+@media (max-width:1100px){.opsgrid{grid-template-columns:minmax(0,1fr)}}
+.stagecol{display:flex;flex-direction:column;gap:10px;min-width:0}
+.stage{position:relative;width:100%;aspect-ratio:16/9;background:#1d2124;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.stage:fullscreen{aspect-ratio:auto;width:100vw;height:100vh;border:0;border-radius:0}
+canvas#cv{position:absolute;inset:0;width:100%;height:100%;display:block}
+.hud{position:absolute;left:12px;right:12px;top:10px;display:flex;justify-content:space-between;gap:12px;pointer-events:none}
+.hud div{background:rgba(11,16,19,.8);padding:3px 10px;border-radius:5px;backdrop-filter:blur(3px)}
+.hud .name{font:600 clamp(14px,1.8vw,20px) var(--display);letter-spacing:.06em;text-transform:uppercase}
+.hud .name small{font:500 11px var(--mono);color:var(--teal);margin-left:8px;letter-spacing:0}
+.hud .clk{font:500 clamp(12px,1.4vw,15px) var(--mono);font-variant-numeric:tabular-nums}
+.live{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin-right:7px;vertical-align:middle}
+.paused .live{background:var(--muted)}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px 11px;font:500 13px var(--body);cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn.on{border-color:var(--amber);color:var(--amber)}
+.btn.warn{border-color:rgba(255,93,82,.5);color:#ffb3ad}
+.btn.sm{padding:4px 8px;font-size:12px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+select,input[type=search]{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:13px}
+.spacer{flex:1}
+.note{color:var(--muted);font-size:12px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:6px;vertical-align:-2px}
+aside{display:flex;flex-direction:column;gap:12px;min-width:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;min-width:0}
+.card h2,.card h3{font:600 15px var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.card h2 em,.card h3 em{font:500 11px var(--mono);font-style:normal;letter-spacing:0;color:var(--teal);text-transform:none}
+.desc p{margin:0 0 8px}
+.desc ul{margin:0;padding-left:18px;color:var(--muted);font-size:13px;display:flex;flex-direction:column;gap:4px}
+.codes{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
+.code{font:500 11px var(--mono);border:1px solid var(--line2);border-radius:4px;padding:0 6px;color:var(--amber)}
+.chips{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.chip{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);border-radius:5px;font-size:12.5px;background:var(--panel2)}
+.chip b{width:9px;height:9px;border-radius:50%;background:#3a464d;flex:none}
+.chip.on b{background:var(--teal);box-shadow:0 0 8px var(--teal)}
+.chip.warn b{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+.chip.bad b{background:var(--red);box-shadow:0 0 8px var(--red)}
+.chipsub{font-size:11.5px;color:var(--muted);margin-top:6px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;color:var(--muted);font-weight:500;padding:5px 7px;border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;top:0;background:var(--panel)}
+td{padding:5px 7px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;vertical-align:top}
+td.mono,.mono{font-family:var(--mono)}
+.pill{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11.5px;border:1px solid;white-space:nowrap}
+.p-raised{color:var(--amber);border-color:rgba(242,182,50,.5)}
+.p-flat{color:var(--teal);border-color:rgba(56,198,178,.5)}
+.p-move{color:var(--blue);border-color:rgba(91,147,255,.5)}
+.p-hold{color:var(--fg);border-color:var(--muted)}
+.p-bad{color:var(--red);border-color:rgba(255,93,82,.55)}
+.bar{height:6px;background:#26323a;border-radius:3px;overflow:hidden;width:54px;display:inline-block;vertical-align:middle}
+.bar i{display:block;height:100%;background:var(--amber)}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.kpi{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:8px 10px}
+.kpi .v{font:600 24px/1.1 var(--display);font-variant-numeric:tabular-nums}
+.kpi .l{font-size:11.5px;color:var(--muted)}
+.log{list-style:none;margin:0;padding:0;max-height:300px;overflow-y:auto;font:11.5px var(--mono);display:flex;flex-direction:column;gap:5px}
+.log li{display:grid;grid-template-columns:50px 1fr;gap:6px}
+.log li span{color:var(--muted)}
+.log li.warn{color:var(--amber)}.log li.em{color:var(--teal)}.log li.bad{color:var(--red)}
+.btnrow{display:flex;flex-wrap:wrap;gap:6px}
+.lbl{font-size:11.5px;color:var(--muted);margin:8px 0 4px;text-transform:uppercase;letter-spacing:.06em}
+.lbl:first-child{margin-top:0}
+.seg2{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg2 button{background:var(--panel2);border:0;padding:5px 10px;cursor:pointer;font-size:12.5px}
+.seg2 button+button{border-left:1px solid var(--line)}
+.seg2 button.on{background:var(--amber);color:#111}
+/* scenarios */
+.sgroup{margin-bottom:20px}
+.sgroup h2{font:600 18px var(--display);letter-spacing:.08em;text-transform:uppercase;margin:0 0 8px;color:var(--amber)}
+.scards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.scard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:6px}
+.scard:hover{border-color:var(--amber)}
+.scard b{font:600 17px var(--display);letter-spacing:.04em;text-transform:uppercase}
+.scard p{margin:0;color:var(--muted);font-size:12.5px;flex:1}
+.cover{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+.cov{font:500 11.5px var(--mono);padding:2px 7px;border-radius:4px;border:1px solid var(--line)}
+.cov.y{color:var(--teal);border-color:rgba(56,198,178,.5)}
+.cov.n{color:var(--muted)}
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.tblwrap{max-height:62vh;overflow:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:14px}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px}
+.chart canvas{width:100%;height:220px;display:block}
+.healthgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
+.hrow{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:3px 0;border-bottom:1px dashed var(--line)}
+.hrow span:first-child{color:var(--muted)}
+.setgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px}
+.field{display:grid;grid-template-columns:1fr 90px;gap:4px 10px;align-items:center;margin-bottom:10px}
+.field label{font-size:13px}
+.field input[type=range]{grid-column:1/-1;width:100%;accent-color:var(--amber)}
+.field output{font:500 13px var(--mono);text-align:right;color:var(--amber)}
+.field small{grid-column:1/-1;color:var(--muted);font-size:11.5px}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--amber);padding:8px 14px;border-radius:8px;z-index:9;font-size:13px;max-width:90vw}
+.toast[hidden]{display:none}
+footer{margin-top:20px;color:var(--muted);font-size:12px}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="9" fill="#151c20" stroke="#32424c"/><path d="M6 27h28" stroke="#f2b632" stroke-width="3"/><path d="M8 27c3-9 9-12 12-12s9 3 12 12" fill="none" stroke="#38c6b2" stroke-width="2.5"/><path d="M14 27l6-12 6 12" fill="#f2b63233" stroke="none"/></svg>
+      <div><b>Smart Speed Breaker</b><span>Operations Console</span></div>
+    </div>
+    <div class="status" id="topStatus"></div>
+    <div class="clock" id="topClock"></div>
+  </header>
+  <nav class="nav" id="nav" role="tablist">
+    <button role="tab" data-view="ops" aria-selected="true">Live operations</button>
+    <button role="tab" data-view="scen" aria-selected="false">Scenarios</button>
+    <button role="tab" data-view="log" aria-selected="false">Evidence log<span class="badge" id="logBadge">0</span></button>
+    <button role="tab" data-view="ana" aria-selected="false">Analytics</button>
+    <button role="tab" data-view="health" aria-selected="false">Asset health</button>
+    <button role="tab" data-view="set" aria-selected="false">Settings</button>
+  </nav>
+
+  <section class="view" id="v-ops">
+    <div class="opsgrid">
+      <div class="stagecol">
+        <div class="stage" id="stage">
+          <canvas id="cv" aria-label="Top-down road view of the smart speed breaker site"></canvas>
+          <div class="hud"><div class="name" id="hudName"></div><div class="clk" id="hudClock"></div></div>
+        </div>
+        <div class="controls">
+          <button class="btn" id="play" type="button">Pause</button>
+          <button class="btn" id="restart" type="button">Restart</button>
+          <span class="seg2" id="speedSeg"><button data-speed="0.5">0.5×</button><button data-speed="1" class="on">1×</button><button data-speed="2">2×</button><button data-speed="4">4×</button></span>
+          <span class="seg2" id="camSeg"><button data-cam="over" class="on">Overview</button><button data-cam="zoom">Zoom to unit</button></span>
+          <select id="siteSel" aria-label="Focus site"></select>
+          <select id="envSel" aria-label="Environment"><option value="day">Day</option><option value="night">Night</option><option value="sand">Sandstorm</option><option value="rain">Heavy rain</option></select>
+          <span class="spacer"></span>
+          <button class="btn" id="full" type="button">Full screen</button>
+        </div>
+        <div class="legend">
+          <span><i style="background:var(--amber)"></i>Unit raised</span>
+          <span><i style="background:#4a555c"></i>Unit flush</span>
+          <span><i style="background:rgba(56,198,178,.45)"></i>Active approach geofence</span>
+          <span><i style="background:var(--teal);height:2px;vertical-align:3px"></i>V2X link</span>
+          <span><i style="background:#3b7bff"></i>Blue sweep: lowering for emergency</span>
+          <span><i style="background:var(--red)"></i>Red: do not follow / fault</span>
+        </div>
+        <div class="note">EB = eastbound lane (bottom), WB = westbound lane (top). Each lane segment actuates on its own. Distances and speeds are to scale in metres; vehicle bodies are drawn larger than life in overview. Space pauses.</div>
+      </div>
+      <aside>
+        <div class="card desc"><h2>Use case <em id="modeTag"></em></h2><div id="desc"></div></div>
+        <div class="card"><h2>Trigger signals <em id="focusName"></em></h2><div class="chips" id="chips"></div><div class="chipsub">Lowering needs a dispatch or V2X credential plus a second signal (two of three), a clear zone, and agreeing sensors.</div></div>
+        <div class="card"><h2>Lane segments</h2><table><thead><tr><th>Unit</th><th>State</th><th>Height</th></tr></thead><tbody id="segs"></tbody></table></div>
+        <div class="card"><h2>Site override <em>logged like any actuation</em></h2>
+          <div class="btnrow" id="ovr">
+            <button class="btn sm" data-lock="flush">Lock flush</button>
+            <button class="btn sm" data-lock="raised">Lock raised</button>
+            <button class="btn sm" data-lock="maint">Maintenance lockout</button>
+            <button class="btn sm" data-lock="">Release</button>
+          </div>
+          <div class="lbl">Platform command (edge verifies against local sensors)</div>
+          <div class="btnrow"><button class="btn sm" id="cmdLower">Send LOWER intent</button><button class="btn sm" id="cmdAll">Send LOWER ALL (attack test)</button></div>
+        </div>
+        <div class="card"><h2>Dispatch and traffic <em>sandbox controls</em></h2>
+          <div class="controls" style="margin-bottom:8px"><span class="note">Lane</span><span class="seg2" id="laneSeg"><button data-lane="0" class="on">EB</button><button data-lane="1">WB</button></span></div>
+          <div class="btnrow" id="disp">
+            <button class="btn sm" data-d="amb">Ambulance</button>
+            <button class="btn sm" data-d="fire">Fire truck</button>
+            <button class="btn sm" data-d="police">Police pursuit</button>
+            <button class="btn sm" data-d="car">Civilian car</button>
+            <button class="btn sm" data-d="tail">Ambulance + tailgater</button>
+            <button class="btn sm" data-d="fake">Fake siren car</button>
+            <button class="btn sm" data-d="clone">Cloned tag</button>
+            <button class="btn sm" data-d="replay">Replayed message</button>
+            <button class="btn sm" data-d="ret">Ambulance returning</button>
+            <button class="btn sm" data-d="bike">Cyclist</button>
+            <button class="btn sm" data-d="ped">Pedestrian</button>
+          </div>
+          <div class="lbl">Inject faults</div>
+          <div class="btnrow" id="inj">
+            <button class="btn sm warn" data-i="grid">Grid loss</button>
+            <button class="btn sm warn" data-i="fault">Controller fault</button>
+            <button class="btn sm" data-i="power">Restore power</button>
+            <button class="btn sm warn" data-i="link">Drop platform link</button>
+            <button class="btn sm" data-i="linkup">Restore link</button>
+            <button class="btn sm warn" data-i="jam">Actuator jam</button>
+            <button class="btn sm warn" data-i="stuck">Stuck flush</button>
+            <button class="btn sm warn" data-i="sens">Sensors disagree</button>
+            <button class="btn sm warn" data-i="flood">Flood pit</button>
+            <button class="btn sm warn" data-i="sand">Sand and heat</button>
+            <button class="btn sm" data-i="clear">Clear all faults</button>
+          </div>
+        </div>
+        <div class="card"><h2>Outcome</h2><div class="kpis" id="kpis"></div></div>
+        <div class="card"><h2>Controller event log</h2><ul class="log" id="log"></ul></div>
+      </aside>
+    </div>
+  </section>
+
+  <section class="view" id="v-scen" hidden>
+    <div class="note" style="margin-bottom:10px">Each scenario is a scripted, repeatable test of one use case from the product document. Pick one to run it on the live road view.</div>
+    <div class="cover" id="cover"></div>
+    <div id="scenList"></div>
+  </section>
+
+  <section class="view" id="v-log" hidden>
+    <div class="tools">
+      <select id="logType"><option value="">All event types</option></select>
+      <input type="search" id="logQ" placeholder="Search vehicle, plate, incident, site…" size="30">
+      <span class="spacer"></span>
+      <button class="btn" id="logCsv">Export CSV</button>
+      <button class="btn" id="logJson">Export JSON</button>
+      <button class="btn warn" id="logClear">Clear</button>
+    </div>
+    <div class="tblwrap"><table><thead><tr><th>Event</th><th>Time</th><th>Type</th><th>Scenario</th><th>Unit</th><th>Vehicle</th><th>Plate</th><th>Incident</th><th>km/h</th><th>Actuation s</th><th>Reset s</th><th>Clip ref</th><th>Detail</th></tr></thead><tbody id="logBody"></tbody></table></div>
+    <div class="note" style="margin-top:8px">Every actuation, emergency passage, rejected request, flush crossing and fault is recorded with a clip reference. Records persist in this browser. Clip references are placeholders; this console has no camera feed.</div>
+  </section>
+
+  <section class="view" id="v-ana" hidden>
+    <div class="tiles" id="tiles"></div>
+    <div class="charts">
+      <div class="card chart"><h3>Estimated seconds saved per emergency passage <em>vs a raised bump</em></h3><canvas id="chSaved"></canvas></div>
+      <div class="card chart"><h3>Civilian speed over raised units <em>km/h</em></h3><canvas id="chCiv"></canvas></div>
+      <div class="card chart"><h3>Evidence records by type</h3><canvas id="chTypes"></canvas></div>
+    </div>
+    <div class="note" style="margin-top:8px">Figures cover this browser session's simulated traffic. Seconds saved is modelled from approach speed and vehicle acceleration against a raised bump; the real figure has to come from a measured pilot.</div>
+  </section>
+
+  <section class="view" id="v-health" hidden>
+    <div class="tools"><span class="note">Telemetry is simulated from the controller model: sand level, heat, cycle counts and motor current feed the trend.</span><span class="spacer"></span></div>
+    <div class="healthgrid" id="healthGrid"></div>
+  </section>
+
+  <section class="view" id="v-set" hidden>
+    <div class="setgrid">
+      <div class="card"><h2>Controller thresholds</h2><div id="setCtl"></div></div>
+      <div class="card"><h2>Environment</h2><div id="setEnv"></div></div>
+      <div class="card"><h2>Edge message bus <em>signed, counter-checked</em></h2><ul class="log" id="bus" style="max-height:360px"></ul></div>
+    </div>
+    <div class="btnrow" style="margin-top:12px"><button class="btn" id="setReset">Reset settings to defaults</button></div>
+  </section>
+
+  <footer>Simulated controller: no real hardware, dispatch or V2X connection. Safety rule applied everywhere: the unit never moves under or in front of a vehicle.</footer>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(()=>{
+'use strict';
+/* ====================================================================== constants */
+const kmh=v=>v/3.6, clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const $=id=>document.getElementById(id);
+const DEF={geo:120,v2x:150,ac:130,lowerT:2.2,raiseT:3,clearDelay:1,margin:0.7};
+let ST={...DEF};
+try{const s=JSON.parse(localStorage.getItem('ssb.settings.v1')||'null');if(s)ST={...DEF,...s}}catch(_){}
+const saveST=()=>{try{localStorage.setItem('ssb.settings.v1',JSON.stringify(ST))}catch(_){}};
+
+const TYPES={
+  car:{len:4.5,color:'#9fb4c2',acc:2.6,name:'Car'},
+  suv:{len:5,color:'#c8bfa9',acc:2.4,name:'SUV'},
+  van:{len:5.8,color:'#d6dbde',acc:2.0,name:'Van'},
+  amb:{len:6.6,color:'#f3f5f6',acc:3.0,name:'Ambulance'},
+  fire:{len:9.5,color:'#d8433b',acc:2.2,name:'Fire truck'},
+  police:{len:4.9,color:'#eef1f3',acc:3.4,name:'Police car'},
+  bike:{len:1.9,color:'#3d6fb5',acc:1.2,name:'Cyclist'}
+};
+const CIV_COLORS=['#9fb4c2','#b9473f','#3c5f8d','#2d3a3f','#d9d9d4','#7b8a52','#c9a24a','#8a5a8f'];
+const EMV={dispatch:true,tag:true,siren:true,hw:1.2};
+const plateOf=n=>'ABCDEFGHJKLMNPRSTUVWXYZ'[(n*7)%23]+' '+String(1000+(n*7919)%9000);
+const hx=s=>{let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return(h>>>0).toString(16).padStart(8,'0')};
+
+/* ====================================================================== scenarios */
+const GROUPS=['Emergency operations','Civilians and vulnerable road users','Security and misuse','Environment','System health','Operations'];
+const SC=[
+ {id:'normal',g:0,codes:[],name:'Normal calming',dur:24,len:260,sites:[165],
+  lead:'With no emergency traffic the unit stays raised and works as an ordinary speed breaker.',
+  watch:['Every car slows to about 15 km/h at the unit','No trigger signals fire, so the controller never moves','Outcome panel shows the calming effect is kept'],
+  spawns:[{t:0,type:'car',lane:0,kmh:50},{t:0.5,type:'suv',lane:1,kmh:50},{t:3,type:'van',lane:0,kmh:45},{t:4.5,type:'car',lane:1,kmh:55},{t:7,type:'car',lane:0,kmh:60},{t:9,type:'suv',lane:1,kmh:50},{t:11,type:'car',lane:0,kmh:50},{t:13,type:'car',lane:1,kmh:45}]},
+ {id:'emergency',g:0,codes:['E1'],name:'Emergency passage',dur:27,len:260,sites:[165],
+  lead:'An ambulance on an active dispatch approaches at 80 km/h. Dispatch geofence, V2X and siren confirm it, the eastbound segment drops flush and the ambulance crosses without braking.',
+  watch:['Geofence lights up at 120 m; unit is flush with about 3 s to spare','Westbound segment hears the siren but stays raised','After the ambulance clears, the unit raises only when the zone is empty'],
+  spawns:[{t:0,type:'car',lane:1,kmh:50},{t:2,type:'amb',lane:0,kmh:80,...EMV,label:'Ambulance A1'},{t:5,type:'suv',lane:1,kmh:50},{t:10,type:'car',lane:0,kmh:50},{t:13,type:'van',lane:0,kmh:50}]},
+ {id:'convoy',g:0,codes:['E2'],name:'Convoy',dur:28,len:260,sites:[165],
+  lead:'An ambulance and a fire truck respond to the same incident about 3 seconds apart. The unit holds flush until the last credentialed vehicle has cleared, so it never rises between them.',
+  watch:['Unit lowers once for both vehicles','No raise starts while the fire truck is still inside its 150 m V2X window','Raise begins only after the fire truck clears and the zone is empty'],
+  spawns:[{t:1,type:'car',lane:1,kmh:50},{t:2,type:'amb',lane:0,kmh:80,...EMV,label:'Ambulance A1'},{t:4.6,type:'fire',lane:0,kmh:75,...EMV,label:'Fire truck F2'},{t:7,type:'suv',lane:1,kmh:50},{t:15,type:'car',lane:0,kmh:50}]},
+ {id:'fast',g:0,codes:['E3'],name:'Arrives faster than planned',dur:24,len:260,sites:[165],cam:'zoom',
+  lead:'An ambulance joins the road only 34 m before the unit at 95 km/h. There is no time to lower safely, so the controller keeps the unit raised and warns the crew in the cab.',
+  watch:['Time to arrival is shorter than the lowering time, so lowering is never started','In-cab V2X warning goes to the crew','Ambulance brakes like it would today; nothing moves under it'],
+  spawns:[{t:0,type:'car',lane:1,kmh:50},{t:3,type:'amb',lane:0,kmh:95,x:128,v0:kmh(95),...EMV,label:'Ambulance A1 (joins from side road)'},{t:9,type:'car',lane:0,kmh:50},{t:11,type:'suv',lane:1,kmh:50}]},
+ {id:'opposite',g:0,codes:['E4'],name:'Opposite lane',dur:24,len:260,sites:[165],
+  lead:'A fire truck responds westbound while normal traffic flows eastbound. Only the westbound segment lowers; the eastbound segment hears the same siren and stays raised.',
+  watch:['Acoustic signal is ambiguous about direction, so it never triggers on its own','Eastbound cars keep slowing at their raised segment','Westbound segment resets after the truck clears'],
+  spawns:[{t:0,type:'car',lane:0,kmh:50},{t:2,type:'fire',lane:1,kmh:70,...EMV,label:'Fire truck F2'},{t:3,type:'suv',lane:0,kmh:50},{t:6,type:'car',lane:0,kmh:55},{t:12,type:'car',lane:1,kmh:50}]},
+ {id:'overtake',g:0,codes:['E5'],name:'Overtaking in the opposite lane',dur:26,len:260,sites:[165],
+  lead:'Traffic is queued eastbound, so the ambulance overtakes on the westbound side. The controller lowers the segment the vehicle is physically on, not its nominal lane.',
+  watch:['Westbound segment lowers for an eastbound-heading ambulance','The eastbound segment with the queue stays raised','Westbound traffic arrives only after the segment has raised again'],
+  spawns:[{t:0,type:'car',lane:0,kmh:50,x:150,v0:0,hold:8},{t:0,type:'suv',lane:0,kmh:50,x:140,v0:0,hold:8.6},{t:0,type:'car',lane:0,kmh:50,x:130,v0:0,hold:9.2},{t:0,type:'van',lane:0,kmh:50,x:119,v0:0,hold:9.8},{t:2,type:'amb',lane:1,dir:1,x:-12,kmh:80,...EMV,label:'Ambulance A1 (opposite lane)'},{t:17,type:'suv',lane:1,kmh:50}]},
+ {id:'returning',g:0,codes:['E7'],name:'Returning without lights',dur:30,len:260,sites:[165],
+  lead:'An ambulance returns to station with a valid V2X credential but its dispatch status is available, not en route. Dispatch status decides, so the unit stays raised. A later call gets full priority.',
+  watch:['Valid credential alone does not trigger lowering','Returning ambulance slows like any vehicle','The second ambulance, with a patient on board, gets a flush unit'],
+  spawns:[{t:1,type:'car',lane:1,kmh:50},{t:2,type:'amb',lane:0,kmh:70,tag:true,status:'returning',hw:1.5,label:'Ambulance A3 (returning, lights off)'},{t:8,type:'suv',lane:1,kmh:50},{t:14,type:'amb',lane:0,kmh:80,...EMV,status:'patient',label:'Ambulance A1 (patient on board)'}]},
+ {id:'pursuit',g:0,codes:['E8'],name:'Police pursuit, no dispatch record',dur:24,len:260,sites:[165],
+  lead:'A police car in an unplanned pursuit has no dispatch record. A V2X credential plus its siren are two of three signals, so the unit still lowers.',
+  watch:['Dispatch chip stays dark','V2X plus siren is enough for the edge controller','Unit raises after the police car clears'],
+  spawns:[{t:0,type:'car',lane:1,kmh:50},{t:2,type:'police',lane:0,kmh:95,tag:true,siren:true,hw:1.2,label:'Police P7 (pursuit)'},{t:6,type:'suv',lane:1,kmh:50},{t:12,type:'car',lane:0,kmh:50}]},
+ {id:'queue',g:0,codes:['E9'],name:'Queue on the unit',dur:30,len:260,sites:[165],cam:'zoom',
+  lead:'Traffic is queued on top of the unit when an ambulance approaches. The unit cannot lower under vehicles, so it waits for a clear zone and tells the crew over V2X that the unit is blocked.',
+  watch:['Lower request is held while cars sit on the unit','In-cab warning tells the crew to slow','Unit lowers as soon as the queue clears'],
+  spawns:[{t:0,type:'car',lane:0,kmh:50,x:162,v0:0,hold:1.5},{t:0,type:'suv',lane:0,kmh:50,x:152,v0:0,hold:2.1},{t:2.5,type:'amb',lane:0,kmh:80,...EMV,label:'Ambulance A1'},{t:5,type:'car',lane:1,kmh:50}]},
+ {id:'corridor',g:0,codes:['Corridor'],name:'Green corridor',dur:31,len:520,sites:[100,210,320],signal:{x:430,lane:0},
+  lead:'One dispatch event clears the whole route. Three speed breakers lower in sequence and the traffic signal ahead is pre-empted to green, so the queue clears before the ambulance arrives.',
+  watch:['Each unit lowers as the ambulance reaches its 120 m geofence','Signal turns green early enough for queued cars to move off','Westbound units stay raised throughout'],
+  spawns:[{t:0,type:'car',lane:0,kmh:50,x:420,v0:0},{t:0,type:'suv',lane:0,kmh:50,x:410,v0:0},{t:1,type:'car',lane:1,kmh:50},{t:2,type:'amb',lane:0,kmh:80,...EMV,label:'Ambulance A1'},{t:7,type:'suv',lane:1,kmh:50},{t:14,type:'car',lane:1,kmh:50}]},
+
+ {id:'tailgate',g:1,codes:['C1','S5'],name:'Tailgating',dur:28,len:260,sites:[165],cam:'zoom',
+  lead:'A civilian car follows the ambulance about half a second behind. The unit never rises in front of or under a moving vehicle, so the tailgater crosses flat and the crossing is logged with its plate for the police platform.',
+  watch:['Raise is held while the tailgater is in the 25 m approach zone','The flush crossing is accepted, recorded and the plate captured','Unit raises once the zone has been clear for 1 s'],
+  spawns:[{t:2,type:'amb',lane:0,kmh:80,...EMV,label:'Ambulance A1'},{t:2.62,type:'car',lane:0,kmh:80,hw:0.45,label:'Tailgating car'},{t:13,type:'car',lane:0,kmh:50},{t:1,type:'car',lane:1,kmh:50},{t:8,type:'suv',lane:1,kmh:50}]},
+ {id:'broken',g:1,codes:['C2'],name:'Broken-down vehicle on the unit',dur:32,len:260,sites:[165],cam:'zoom',
+  lead:'A car has broken down on the eastbound unit. The unit locks in place, operations are alerted and dispatch is told to reroute. When the car is towed away the unit becomes available again.',
+  watch:['Controller flags a stationary vehicle on the unit and alerts operations','Ambulance receives an in-cab warning and queues behind the car','After the tow, the unit lowers and the ambulance crosses flush'],
+  events:[{t:14,run:S=>{S.veh=S.veh.filter(v=>!v.broken);log('Tow truck cleared the vehicle — unit released','em')}}],
+  spawns:[{t:0,type:'suv',lane:0,kmh:0,x:163,v0:0,broken:true,label:'Broken-down SUV'},{t:2,type:'car',lane:1,kmh:50},{t:5,type:'amb',lane:0,kmh:80,...EMV,label:'Ambulance A1'},{t:9,type:'car',lane:1,kmh:50}]},
+ {id:'pedestrian',g:1,codes:['C3'],name:'Pedestrians on the table',dur:26,len:260,sites:[165],cam:'zoom',zebra:true,
+  peds:[{t:3,rate:0.17,off:-1},{t:3.8,rate:0.17,off:1.4},{t:6,rate:0.2,off:0}],
+  lead:'A raised table doubles as a zebra crossing. Pedestrians are on the plate when the ambulance triggers the unit. Presence sensing freezes the request until the whole table is clear, and the ambulance yields to the pedestrians.',
+  watch:['Lower request is held while anyone is on the table','Ambulance slows for the pedestrians instead of forcing the unit','Unit lowers only after the table is empty'],
+  spawns:[{t:0,type:'car',lane:1,kmh:50},{t:2,type:'amb',lane:0,kmh:80,...EMV,label:'Ambulance A1'},{t:14,type:'suv',lane:1,kmh:50}]},
+ {id:'cyclist',g:1,codes:['C4'],name:'Cyclist on the unit',dur:24,len:260,sites:[165],cam:'zoom',
+  lead:'A cyclist crosses the raised unit just as an ambulance triggers it. The unit does not start moving while the cyclist is on or near it, so nobody meets a part-raised edge.',
+  watch:['Lowering is held until the cyclist is clear','Unit is never stopped part-way with traffic near','Ambulance still arrives with enough time to lower'],
+  spawns:[{t:0,type:'bike',lane:0,kmh:12,x:150,v0:kmh(12),label:'Cyclist'},{t:1.4,type:'amb',lane:0,kmh:80,...EMV,label:'Ambulance A1'},{t:6,type:'car',lane:1,kmh:50}]},
+
+ {id:'falsealarm',g:2,codes:['S1'],name:'False alarm',dur:22,len:260,sites:[165],
+  lead:'A private car fitted with an aftermarket siren approaches. The acoustic sensor hears it, but there is no dispatch incident and no V2X credential, so the request is rejected.',
+  watch:['Only one of three signals is present','Unit stays raised and the car slows like any other','Rejected request is logged for the operations team'],
+  spawns:[{t:0,type:'car',lane:1,kmh:50},{t:2,type:'car',lane:0,kmh:65,siren:true,hw:1.5,label:'Car with aftermarket siren',color:'#7f8f9a'},{t:7,type:'suv',lane:0,kmh:50},{t:9,type:'car',lane:1,kmh:50}]},
+ {id:'security',g:2,codes:['S2','H3'],name:'Link loss and cloned tag',dur:30,len:260,sites:[165],
+  lead:'The link to the central platform drops, so the dispatch trigger is unavailable. A private car carrying a cloned credential is rejected on its signature. The edge controller still lowers for the real ambulance on V2X plus siren.',
+  watch:['T+1 s platform link lost; dispatch geofence chip goes dark','Cloned tag fails signature check; police are alerted and the unit stays raised','Ambulance still gets a flush unit on two of three signals'],
+  events:[{t:1,run:S=>{S.link=false;log('Platform link lost — edge controller continues on V2X + siren','warn');evid({type:'FAULT',detail:'Platform link lost'})}}],
+  spawns:[{t:0,type:'car',lane:1,kmh:50},{t:2,type:'car',lane:0,kmh:60,tag:true,forged:'clone',hw:1.5,label:'Car with cloned tag',color:'#7f8f9a'},{t:6,type:'suv',lane:1,kmh:50},{t:13.5,type:'amb',lane:0,kmh:80,...EMV,label:'Ambulance A1'}]},
+ {id:'replay',g:2,codes:['S3'],name:'Replayed message',dur:30,len:260,sites:[165],
+  lead:'An attacker replays a recorded, validly signed emergency message from a private car. Every message carries a one-time counter, so the edge controller sees the counter was already used and rejects it.',
+  watch:['Signature is valid but the counter was already consumed','Request is rejected and logged; unit stays raised','A genuine ambulance with a fresh counter is accepted afterwards'],
+  spawns:[{t:0,type:'car',lane:1,kmh:50},{t:2,type:'car',lane:0,kmh:60,tag:true,forged:'replay',hw:1.5,label:'Car replaying a recorded message',color:'#7f8f9a'},{t:7,type:'suv',lane:1,kmh:50},{t:17,type:'amb',lane:0,kmh:80,...EMV,label:'Ambulance A1'}]},
+ {id:'attack',g:2,codes:['S4'],name:'Platform commands mass actuation',dur:24,len:260,sites:[85,185],
+  lead:'The central platform is compromised and commands every unit to lower. Each edge controller checks the command against its own sensors, finds no emergency vehicle, and refuses.',
+  watch:['LOWER ALL arrives at both sites and is refused at both','Traffic keeps slowing over raised units; nothing moves','Rejections are logged as evidence for the security team'],
+  events:[{t:3,run:S=>platformCmd(S,'all')},{t:9,run:S=>platformCmd(S,'all')}],
+  spawns:[{t:0,type:'car',lane:0,kmh:50},{t:1,type:'suv',lane:1,kmh:50},{t:6,type:'car',lane:0,kmh:55},{t:8,type:'van',lane:1,kmh:50},{t:12,type:'car',lane:0,kmh:50}]},
+
+ {id:'flood',g:3,codes:['N3'],name:'Flash flood fills the pit',dur:32,len:260,sites:[165],cam:'zoom',
+  lead:'Heavy rain fills the pit. The water-level sensor trips, the unit stays raised, and it reports itself unavailable to dispatch so the next ambulance is warned.',
+  watch:['First ambulance, before the flood, gets a flush unit','Water level rises past the limit; the unit is marked unavailable','Second ambulance crosses slowly over a raised unit; dispatch is told to expect delay'],
+  env:'rain',
+  events:[{t:10,run:S=>{S.flooding=true;log('Rain: pit water level rising','warn')}}],
+  spawns:[{t:0,type:'car',lane:1,kmh:50},{t:2,type:'amb',lane:0,kmh:80,...EMV,label:'Ambulance A1'},{t:6,type:'suv',lane:1,kmh:45},{t:18,type:'amb',lane:0,kmh:80,...EMV,label:'Ambulance A2'},{t:21,type:'car',lane:1,kmh:45}]},
+ {id:'sand',g:3,codes:['N1','N2'],name:'Sand, heat and nightly self-test',dur:34,len:260,sites:[165],env:'sand',cam:'zoom',
+  lead:'Road surface hits 63 °C and sand builds up in the housing. Lowering slows, motor current rises, and the nightly self-test spots the trend so a crew can service the unit before it fails.',
+  watch:['Heat derate and sand alarms appear in the log','Lowering time stretches but still beats the ambulance','Self-test on the quiet westbound segment shows the rising motor current'],
+  events:[{t:0.5,run:S=>{S.env.sand=0.8;S.env.temp=63;log('Surface 63 °C, sand level 80% — heat derate active, actuation slower','warn')}},{t:15,run:S=>selfTest(S.sites[0].segs[1])}],
+  spawns:[{t:1,type:'car',lane:1,kmh:50},{t:2,type:'amb',lane:0,kmh:80,...EMV,label:'Ambulance A1'},{t:9,type:'suv',lane:0,kmh:50}]},
+ {id:'night',g:3,codes:['N5'],name:'Night and sandstorm',dur:27,len:260,sites:[165],env:'night',cam:'zoom',
+  lead:'At night the unit is hard to see. Embedded LED markers show its state: steady amber when raised, a blue sweep while lowering for an emergency, and red do-not-follow after the ambulance passes.',
+  watch:['LED studs change colour with the unit state','Red do-not-follow shows right after the emergency vehicle','Headlight cones show how little a driver sees without the LEDs'],
+  spawns:[{t:0,type:'car',lane:1,kmh:50},{t:2,type:'amb',lane:0,kmh:80,...EMV,label:'Ambulance A1'},{t:5,type:'suv',lane:1,kmh:50},{t:10,type:'car',lane:0,kmh:50}]},
+
+ {id:'power',g:4,codes:['H1','H2'],name:'Power loss and failsafe',dur:36,len:260,sites:[165],
+  lead:'Grid power drops and the battery keeps the controller working for the first ambulance. Later the controller faults; springs hold the unit raised and the next fire truck slows as it would today.',
+  watch:['T+3 s grid lost, battery takes over with no change in behaviour','T+17 s controller fault, failsafe holds the unit raised and alarms','Fire truck crosses slowly; nothing moves under it'],
+  events:[{t:3,run:S=>{S.power='battery';log('Grid supply lost — controller running on battery backup','warn');evid({type:'FAULT',detail:'Grid supply lost, battery backup active'})}},{t:17,run:S=>{S.power='fault';log('Controller fault detected — maintenance alarm sent to operations','bad');evid({type:'FAULT',detail:'Controller fault, spring failsafe holds unit raised'})}}],
+  spawns:[{t:1,type:'car',lane:1,kmh:50},{t:5,type:'amb',lane:0,kmh:80,...EMV,label:'Ambulance A1'},{t:9,type:'suv',lane:1,kmh:50},{t:19,type:'fire',lane:0,kmh:70,...EMV,label:'Fire truck F2'},{t:21,type:'car',lane:1,kmh:50}]},
+ {id:'jam',g:4,codes:['H4'],name:'Actuator jam',dur:26,len:260,sites:[165],cam:'zoom',
+  lead:'The eastbound actuator jams part-way through lowering, leaving a step in the road. The unit locks, the warning lights come on and the approaching crew gets an in-cab warning, so the ambulance slows rather than hitting a half-height edge at speed.',
+  watch:['Unit stops at roughly 45 mm, the most dangerous state','Nothing tries to move it again under traffic','Ambulance slows like it would for a raised bump; maintenance is alerted'],
+  events:[{t:5,run:S=>{S.sites[0].segs[0].jam=true}}],
+  spawns:[{t:0,type:'car',lane:1,kmh:50},{t:2,type:'amb',lane:0,kmh:80,...EMV,label:'Ambulance A1'},{t:6,type:'suv',lane:1,kmh:50},{t:11,type:'car',lane:0,kmh:50}]},
+ {id:'stuck',g:4,codes:['H5'],name:'Stuck flush',dur:24,len:260,sites:[165],cam:'zoom',
+  lead:'The eastbound unit fails while flush. Emergency vehicles are unaffected but calming is lost, so the controller raises an alert, asks for temporary warning signs and a priority repair.',
+  watch:['Fault is logged and a priority repair ticket raised','Eastbound civilians cross at speed with no calming','Westbound segment keeps working as normal'],
+  events:[{t:1,run:S=>{const s=S.sites[0].segs[0];s.stuck=true;s.h=0;log('Eastbound actuator stuck flush — calming lost, temporary warning signs requested, priority repair raised','bad');evid({type:'FAULT',unit:'S1 EB',detail:'Stuck flush: calming lost'})}}],
+  spawns:[{t:0,type:'car',lane:1,kmh:50},{t:3,type:'car',lane:0,kmh:60},{t:6,type:'suv',lane:0,kmh:55},{t:8,type:'car',lane:1,kmh:50},{t:11,type:'van',lane:0,kmh:60},{t:15,type:'car',lane:0,kmh:65}]},
+ {id:'sensors',g:4,codes:['H6'],name:'Sensors disagree',dur:30,len:260,sites:[165],
+  lead:'The radar sees a vehicle but the camera reports a clear zone. The controller never acts on a single sensor, so it freezes in its current position and raises an alarm. When the sensors agree again, normal operation resumes.',
+  watch:['Disagreement freezes the unit and raises an alarm','Ambulance crosses a raised unit with an in-cab warning','Second ambulance after recovery gets a flush unit'],
+  events:[{t:3,run:S=>{S.disagree=true;log('Radar and camera disagree on zone occupancy — freeze position and raise alarm','bad');evid({type:'FAULT',detail:'Sensors disagree: radar vs camera'})}},{t:12,run:S=>{S.disagree=false;log('Sensors agree again — normal operation resumes','em')}}],
+  spawns:[{t:0,type:'car',lane:1,kmh:50},{t:2,type:'amb',lane:0,kmh:80,...EMV,label:'Ambulance A1'},{t:7,type:'suv',lane:1,kmh:50},{t:16,type:'amb',lane:0,kmh:80,...EMV,label:'Ambulance A2'}]},
+
+ {id:'event',g:5,codes:['O1'],name:'Marathon event mode',dur:30,len:260,sites:[165],cam:'zoom',zebra:true,
+  peds:[{t:3,rate:0.33,off:-2.5},{t:3.6,rate:0.36,off:0.5},{t:4.1,rate:0.3,off:2.2},{t:5,rate:0.35,off:-1},{t:5.6,rate:0.38,off:1.4},{t:6.5,rate:0.32,off:-3},{t:7.1,rate:0.34,off:0},{t:8,rate:0.37,off:2.8}],
+  lead:'Operations put the site in event mode before the marathon: the unit is locked flush from the control room so runners never meet a moving plate. An ambulance later crosses a flush unit.',
+  watch:['Operator lock is logged and the unit lowers while the zone is empty','Runners cross the locked, flush plate','Triggers are ignored while the lock is active'],
+  events:[{t:1,run:S=>setLock(S.sites[0],'flush','Event mode: marathon — unit locked flush from operations')}],
+  spawns:[{t:16,type:'amb',lane:0,kmh:60,...EMV,label:'Ambulance A1'}]},
+ {id:'evac',g:5,codes:['O2'],name:'Evacuation',dur:30,len:330,sites:[75,165,255],
+  lead:'During an evacuation, one command lowers every unit on the evacuation route so traffic can move at speed.',
+  watch:['One operator command lowers all three units','Civilians cross at speed over flush units','Nothing moves under traffic: the lock waits for a clear zone'],
+  events:[{t:1,run:S=>S.sites.forEach((si,i)=>setLock(si,'flush','Evacuation: all units on route lowered',i>0))}],
+  spawns:[{t:5,type:'car',lane:0,kmh:65},{t:6.2,type:'suv',lane:0,kmh:65},{t:7.3,type:'van',lane:0,kmh:60},{t:8.5,type:'car',lane:0,kmh:70},{t:9.4,type:'car',lane:1,kmh:60},{t:10.6,type:'suv',lane:0,kmh:65},{t:12,type:'car',lane:1,kmh:65},{t:13,type:'car',lane:0,kmh:70},{t:15,type:'van',lane:0,kmh:60}]},
+ {id:'maint',g:5,codes:['O3'],name:'Maintenance lockout',dur:34,len:260,sites:[165],cam:'zoom',
+  lead:'A crew is working on the unit. Maintenance mode locks it in place and ignores every trigger, so even an ambulance slows over the raised unit. When the crew releases the lock the next ambulance is served.',
+  watch:['Lockout is logged and triggers are ignored','Ambulance request is not acted on during lockout','After release the next ambulance gets a flush unit'],
+  events:[{t:0.5,run:S=>setLock(S.sites[0],'maint','Maintenance: crew lockout on S1')},{t:15,run:S=>setLock(S.sites[0],null,'Maintenance: lockout released by crew')}],
+  spawns:[{t:1,type:'car',lane:1,kmh:50},{t:3,type:'amb',lane:0,kmh:80,...EMV,label:'Ambulance A1'},{t:9,type:'suv',lane:1,kmh:50},{t:20,type:'amb',lane:0,kmh:80,...EMV,label:'Ambulance A2'},{t:25,type:'car',lane:0,kmh:50}]},
+];
+const LIVE={id:'live',g:-1,codes:[],name:'Live sandbox',dur:Infinity,len:330,sites:[170],live:true,
+  lead:'Free-run site with random civilian traffic. Dispatch vehicles, send commands and inject faults from the controls on the right.',
+  watch:['Use Dispatch and traffic to send emergency or civilian vehicles','Use Inject faults to test the failsafes','Everything you do is recorded in the evidence log'],spawns:[]};
+const ALLCODES=['E1','E2','E3','E4','E5','E6','E7','E8','E9','C1','C2','C3','C4','C5','C6','C7','S1','S2','S3','S4','S5','S6','N1','N2','N3','N4','N5','H1','H2','H3','H4','H5','H6','O1','O2','O3','O4'];
+const COVERED=new Set(['O4',...SC.flatMap(s=>s.codes)]);
+
+/* ====================================================================== state */
+let sc=LIVE,S,playing=true,speed=1,view='ops',cam='over',focusSite=0,lane=0,envOverride=null,W=0,H=0,dpr=2,endHold=0,lastUi=0,logDirty=true,evDirty=true,busDirty=true;
+let EV=[],EVN=0;
+try{EV=JSON.parse(localStorage.getItem('ssb.evidence.v1')||'[]');if(!Array.isArray(EV))EV=[];EVN=EV.reduce((m,e)=>Math.max(m,+String(e.id).slice(3)||0),0)}catch(_){EV=[]}
+const saveEV=()=>{try{localStorage.setItem('ssb.evidence.v1',JSON.stringify(EV))}catch(_){}};
+const A={saved:[],civ:[],passages:0,flush:0};
+const BUS=[];
+const cycleBase=[12840,13217,13594,13971];
+
+function log(msg,kind=''){S.log.unshift({t:S.t,msg,kind});if(S.log.length>80)S.log.pop();logDirty=true}
+function evid(o){const e={id:'EV-'+String(++EVN).padStart(5,'0'),ts:new Date().toISOString(),scn:sc.name,clip:'CLIP-'+hx(String(EVN)+(o.type||'')).slice(0,6).toUpperCase(),...o};EV.unshift(e);if(EV.length>400)EV.pop();saveEV();evDirty=true;return e}
+function bus(dir,msg,ok=true){const sig=hx(msg+'k');BUS.unshift({t:S?S.t:0,dir,msg,sig,ok});if(BUS.length>60)BUS.pop();busDirty=true}
+function toast(m){const t=$('toast');t.textContent=m;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>t.hidden=true,2800)}
+
+function mkSeg(l,i,j){return {lane:l,h:1,state:'RAISED',mode:null,clearT:0,sig:{},cycles:cycleBase[(i*2+l)%4],actTimes:[],cur:[],curT:0,act:null,missed:0,warned:0,dnfUntil:0,jam:false,stuck:false,test:null,lastTest:null,still:0,blockLogged:false,ledPh:0}}
+function reset(){
+  S={t:0,veh:[],peds:[],pend:[],spI:0,pdI:0,evI:0,power:'grid',batt:100,link:true,light:sc.signal?'red':null,preT:0,log:[],act:0,rej:0,civ:[],em:null,emLabel:'',flatCiv:0,nid:1,disagree:false,flooding:false,water:0.05,gen:[1,3],
+    env:{mode:sc.env||'day',sand:0.03,temp:41},ctr:new Set(),
+    sites:sc.sites.map((x,i)=>({x,name:'S'+(i+1),lock:null,lockLabel:'',flooded:false,segs:[0,1].map(l=>mkSeg(l,i))}))};
+  sc.spawns.forEach(s=>s.done=false);
+  (sc.peds||[]).forEach(p=>p.done=false);
+  endHold=0;logDirty=true;busDirty=true;
+  envOverride=null;$('envSel').value=S.env.mode;
+  log('Scenario start — all units raised, power on grid');
+}
+const segName=(site,seg)=>site.name+' '+(seg.lane===0?'EB':'WB');
+function distTo(v,x){return (x-v.x)*v.dir-v.len/2}
+
+function spawn(sp){
+  const T=TYPES[sp.type],dir=sp.dir??(sp.lane===0?1:-1),x=sp.x??(dir===1?-12:sc.len+12);
+  if(S.veh.some(o=>o.lane===sp.lane&&o.dir===dir&&Math.abs(o.x-x)<(o.len+T.len)/2+3))return false;
+  const id=S.nid++,dispatch=!!sp.dispatch,returning=sp.status==='returning';
+  S.veh.push({id,type:sp.type,lane:sp.lane,dir,x,len:T.len,color:sp.color||(sp.type==='car'?CIV_COLORS[id%CIV_COLORS.length]:T.color),acc:T.acc,cruise:kmh(sp.kmh),v:sp.v0??kmh(sp.kmh),hw:sp.hw||1.5,
+    dispatch,tag:!!sp.tag,siren:!!sp.siren,forged:sp.forged||false,status:sp.status||(dispatch?'enroute':'civil'),
+    em:!!(sp.dispatch||sp.tag)&&!sp.forged&&!returning,label:sp.label||T.name,prev:{},seen:{},hold:sp.hold||0,broken:!!sp.broken,
+    plate:plateOf(id),inc:dispatch?'INC-'+(2400+id):'',brake:false});
+  return true;
+}
+function spawnPed(p){S.peds.push({x:S.sites[0].x+(p.off||0),p:0,rate:p.rate||0.18,on:false,ph:Math.random()*6})}
+
+/* ---------- edge controller ---------- */
+function platformCmd(Sx,which,site,seg){
+  const targets=[];
+  Sx.sites.forEach((s,i)=>s.segs.forEach(g=>{if(which==='all'||(s===site&&g===seg))targets.push([s,g])}));
+  for(const [s,g] of targets){
+    const n=segName(s,g),ok=g.sig&&g.sig.conf>=2&&(g.sig.disp||g.sig.v2x);
+    bus('platform→edge',`CMD LOWER ${n} cmdId=${hx(n+Sx.t).slice(0,6)}`,ok);
+    if(ok){log(n+': platform LOWER intent accepted — matches local sensor evidence','em')}
+    else{Sx.rej++;log(n+': platform LOWER command rejected — no local sensor evidence (no credentialed vehicle in zone)','bad');
+      evid({type:'REJECTED',unit:n,detail:'Platform LOWER command refused: no local sensor evidence'});bus('edge→platform',`NACK ${n} reason=NO_LOCAL_EVIDENCE`,false)}
+  }
+}
+function setLock(site,mode,msg,quiet){
+  site.lock=mode;site.lockLabel=msg;if(!quiet)log(msg,mode?'warn':'em');
+  evid({type:'OVERRIDE',unit:site.name,detail:msg});bus('ops→edge',`OVERRIDE ${site.name} mode=${mode||'RELEASE'}`);
+}
+function selfTest(seg){
+  if(!seg||seg.test)return false;
+  if(seg.state!=='RAISED'||S.veh.some(v=>v.lane===seg.lane)||S.peds.some(p=>p.on)){return false}
+  seg.test={phase:0,t:0,low:0};log('Nightly self-test started on the quiet segment, zone confirmed empty');return true;
+}
+
+function control(site,seg,dt){
+  const lane=seg.lane,inLane=S.veh.filter(v=>v.lane===lane),n=segName(site,seg),sd=seg.state;
+  const powered=S.power!=='fault';
+  const lowerT=ST.lowerT*(1+S.env.sand*0.8)*(S.env.temp>60?1.15:1),raiseT=ST.raiseT*(1+S.env.sand*0.4);
+  let disp=false,v2x=null,cred=null,credD=1e9,credA=null,credAD=1e9;
+  for(const v of inLane){
+    const d=distTo(v,site.x);if(d<-(v.len+3))continue;
+    if(v.dispatch&&S.link&&d<=ST.geo){disp=true;if(d<credD){cred=v;credD=d}if(d>=0&&d<credAD){credA=v;credAD=d}}
+    if(v.tag&&d<=ST.v2x){
+      const key=n;
+      if(v.forged){if(!v.seen[key]){v.seen[key]=1;S.rej++;
+        const why=v.forged==='replay'?'message counter already used (replay)':'V2X signature invalid';
+        log(`${n}: ${why} (${v.label}) — rejected, plate ${v.plate} and alert sent to police`,'bad');
+        bus('V2X→edge',`EMERGENCY_PRIORITY ${v.plate} ctr=${v.forged==='replay'?1042:5000+v.id}`,false);
+        evid({type:'REJECTED',unit:n,vehicle:v.label,plate:v.plate,kmh:Math.round(v.v*3.6),detail:why})}}
+      else if(v.status==='returning'){if(!v.seen[key]){v.seen[key]=1;log(`${n}: ${v.label} has a valid credential but dispatch status is "available, returning to station" — no priority`);bus('V2X→edge',`EMERGENCY_PRIORITY ${v.plate} status=AVAILABLE`,false)}}
+      else{v2x=v;if(d<credD){cred=v;credD=d}if(d>=0&&d<credAD){credA=v;credAD=d}
+        if(!v.seen[key]){v.seen[key]=1;let c=5000+v.id;while(S.ctr.has(c))c++;S.ctr.add(c);bus('V2X→edge',`EMERGENCY_PRIORITY ${v.plate} ctr=${c} status=${v.status.toUpperCase()}`)}}
+    }
+    if(v.dispatch&&S.link&&d<=ST.geo&&!v.seen['d'+n]){v.seen['d'+n]=1;bus('platform→edge',`INTENT ${v.inc} ${n} veh=${v.plate} eta=${Math.max(0,d/Math.max(v.v,3)).toFixed(1)}s`)}
+  }
+  const acoustic=powered&&S.veh.some(v=>v.siren&&Math.abs(v.x-site.x)<ST.ac);
+  const pedOn=S.peds.some(p=>p.on&&Math.abs(p.x-site.x)<5);
+  const onTop=pedOn||inLane.some(v=>{const d=distTo(v,site.x);return d<=2&&d>=-(v.len+2)});
+  const approach=pedOn||inLane.some(v=>{const d=distTo(v,site.x);return d<=25&&d>=-(v.len+3)});
+  const reach=(pred)=>pedOn||inLane.some(v=>{if(!pred(v))return false;const d=distTo(v,site.x);return d>=-(v.len+2)&&d<=Math.max(8,v.v*(lowerT+1))});
+  const reachCiv=reach(v=>!v.em),reachAny=reach(()=>true);
+  const conf=(disp?1:0)+(v2x?1:0)+(acoustic?1:0);
+  const credential=powered&&(disp||!!v2x);
+  if(seg.missed){const mv=S.veh.find(v=>v.id===seg.missed);if(!mv||distTo(mv,site.x)<-(mv.len+3))seg.missed=0}
+  const auth=credential&&conf>=2&&!S.disagree&&!seg.missed&&!site.lock;
+  seg.sig={disp:powered&&disp,v2x:powered&&!!v2x,acoustic,clear:!approach,conf};seg.v2xVeh=powered?v2x:null;seg.active=credential&&!site.lock;
+  if(powered&&acoustic&&!disp&&!v2x){
+    const near=S.veh.filter(v=>v.em&&Math.abs(v.x-site.x)<ST.ac);
+    if(!near.length){if(!site.rejLogged){site.rejLogged=true;S.rej++;log(site.name+': siren heard, no dispatch incident or V2X credential — request rejected, unit stays raised','warn');
+      const sv=S.veh.find(v=>v.siren);evid({type:'REJECTED',unit:site.name,vehicle:sv?sv.label:'',plate:sv?sv.plate:'',kmh:sv?Math.round(sv.v*3.6):'',detail:'Siren alone never triggers (1 of 3 signals)'})}}
+    else if(!seg.oppLogged&&near.some(v=>v.lane!==lane)&&!near.some(v=>v.lane===lane)){seg.oppLogged=true;log(n+': siren from the opposite lane — this segment stays raised')}
+  }else if(!acoustic){seg.oppLogged=false;site.rejLogged=false}
+  // vehicle stopped on the unit
+  const stillOn=inLane.some(v=>v.v<0.3&&distTo(v,site.x)<=2&&distTo(v,site.x)>=-(v.len+2));
+  if(stillOn&&!pedOn){seg.still+=dt;if(seg.still>2&&!seg.blockLogged){seg.blockLogged=true;log(n+': vehicle stationary on the unit — locked in place, operations alerted, dispatch told to reroute','warn');evid({type:'FAULT',unit:n,detail:'Stationary vehicle on unit; dispatch flagged to reroute'});bus('edge→platform',`UNIT_BLOCKED ${n}`)}}
+  else{seg.still=0;if(!stillOn)seg.blockLogged=false}
+  // test abort
+  if(seg.test&&(approach||auth||onTop)){log(n+': self-test aborted — vehicle in zone');seg.test=null}
+  const prev=seg.state;let st=prev;
+  if(seg.jam){st='JAMMED'}
+  else if(site.flooded){if(seg.h<1&&!onTop)seg.h=Math.min(1,seg.h+dt/raiseT);st='UNAVAIL'}
+  else if(!powered){if(seg.h<1&&!onTop)seg.h=Math.min(1,seg.h+dt/1.5);st='FAILSAFE'}
+  else if(seg.stuck){seg.h=0;st='STUCK'}
+  else if(S.disagree){st='SENSOR'}
+  else if(site.lock==='maint'){st='MAINT';if(credential&&cred&&!cred.seen['m'+n]){cred.seen['m'+n]=1;log(n+': request from '+cred.label+' ignored — maintenance lockout');S.rej++;evid({type:'REJECTED',unit:n,vehicle:cred.label,plate:cred.plate,detail:'Maintenance lockout: trigger ignored'})}}
+  else if(site.lock==='flush'){
+    if(seg.h>0){if(prev==='LOWERING'||(!onTop&&!reachAny)){seg.h=Math.max(0,seg.h-dt/lowerT);st='LOWERING'}else st='WAIT'}
+    else st='LOCKED'}
+  else if(site.lock==='raised'){
+    if(seg.h<1){if(!approach){seg.h=Math.min(1,seg.h+dt/raiseT);st='RAISING'}else st='FROZEN'}else st='LOCKED'}
+  else if(seg.test){
+    const tt=seg.test;tt.t+=dt;st='TEST';
+    if(tt.phase===0){seg.h=Math.max(0,seg.h-dt/lowerT);if(seg.h<=0){tt.low=tt.t;tt.phase=1;tt.t=0}}
+    else{seg.h=Math.min(1,seg.h+dt/raiseT);if(seg.h>=1){
+      const pct=Math.round(((4+S.env.sand*3.5+(S.env.temp>60?0.6:0))/4-1)*100);seg.lastTest={t:S.t,low:tt.low,pct};seg.cycles++;
+      log(`${n}: nightly self-test — lowering ${tt.low.toFixed(1)} s (baseline ${ST.lowerT.toFixed(1)} s), motor current +${pct}% → ${pct>25?'sand build-up trend, service ticket raised':'within limits'}`,pct>25?'warn':'em');
+      evid({type:'SELF-TEST',unit:n,actT:+tt.low.toFixed(1),detail:`Motor current +${pct}% vs baseline`+(pct>25?'; service ticket raised':'')});
+      seg.test=null;st='RAISED'}}}
+  else if(auth||(seg.mode==='em'&&credential&&!seg.missed&&!site.lock)){
+    seg.mode='em';seg.clearT=0;
+    if(seg.h>0){
+      if(prev==='LOWERING'){seg.h=Math.max(0,seg.h-dt/lowerT);st='LOWERING'}
+      else{
+        const eta=credA?Math.max((-credA.v+Math.sqrt(credA.v*credA.v+2*credA.acc*credAD))/credA.acc,credAD/Math.max(credA.cruise,1)):99;
+        if(seg.h>=1&&!credA){st='RAISED';seg.mode=null}
+        else if(onTop||reachCiv){st=seg.h<1?'FROZEN':'WAIT';
+          if(cred&&seg.warned!==cred.id){seg.warned=cred.id;log(`${n}: in-cab warning (V2X) to ${cred.label} — unit blocked ahead, slow down`,'warn');bus('edge→V2X',`UNIT_BLOCKED ${n} to=${cred.plate}`)}}
+        else if(seg.h===1&&credA.v>8&&eta<lowerT+ST.margin){
+          seg.missed=credA.id;st='RAISED';
+          log(`${n}: ${credA.label} arrives in ${eta.toFixed(1)} s, lowering takes ${lowerT.toFixed(1)} s — window missed, unit kept raised, in-cab warning sent`,'warn');
+          bus('edge→V2X',`WINDOW_MISSED ${n} to=${credA.plate}`);evid({type:'FAULT',unit:n,vehicle:credA.label,plate:credA.plate,kmh:Math.round(credA.v*3.6),detail:'Detection window missed; unit kept raised'})}
+        else{
+          if(prev!=='LOWERING'&&seg.h===1){seg.cycles++;seg.act={start:S.t,rs:null,actT:null,label:cred?cred.label:'',plate:cred?cred.plate:'',inc:cred?cred.inc:'',kmh:cred?Math.round(cred.v*3.6):0}}
+          seg.h=Math.max(0,seg.h-dt/lowerT);st='LOWERING'}}}
+    if(seg.h<=0)st='FLAT';
+  }else if(seg.h<1){
+    if(approach){seg.clearT=0;st=(prev==='RAISING'||prev==='FROZEN')?'FROZEN':'HOLD'}
+    else{seg.clearT+=dt;if(seg.clearT>=ST.clearDelay){seg.h=Math.min(1,seg.h+dt/raiseT);st='RAISING'}else st=prev==='FROZEN'?'FROZEN':'HOLD'}
+    if(seg.h>=1){st='RAISED';seg.mode=null}
+  }else{st='RAISED';seg.mode=null}
+  if(st==='FLAT'&&seg.act&&seg.act.actT==null){seg.act.actT=S.t-seg.act.start;seg.actTimes.push(seg.act.actT);if(seg.actTimes.length>20)seg.actTimes.shift()}
+  if(st==='RAISING'&&seg.act&&seg.act.rs==null)seg.act.rs=S.t;
+  if(st!==prev){seg.state=st;
+    const why=[seg.sig.disp&&'dispatch geofence',seg.sig.v2x&&'V2X',acoustic&&'siren'].filter(Boolean).join(' + ');
+    const M={LOWERING:[site.lock?`${n}: lowering — ${site.lockLabel}`:`${n}: lowering — ${why} confirmed (${conf}/3)`,'em'],
+      WAIT:[`${n}: lower request held — ${pedOn?'pedestrian on the unit':'vehicle on or approaching the unit'}`,'warn'],
+      FLAT:[`${n}: flush with road surface`,'em'],HOLD:[`${n}: emergency vehicle clear — waiting for empty zone before raising`,''],
+      FROZEN:[`${n}: vehicle entered zone while moving — movement stopped`,'warn'],RAISING:[`${n}: zone clear for ${ST.clearDelay.toFixed(0)} s — raising`,''],
+      RAISED:[`${n}: raised, calming restored`,''],FAILSAFE:[`${n}: spring failsafe holds unit raised, triggers ignored`,'bad'],
+      JAMMED:[`${n}: actuator jammed at ${Math.round(seg.h*75)} mm — unit locked, warning lights on, in-cab warning sent to approaching crews`,'bad'],
+      UNAVAIL:[`${n}: pit water level high — unit stays raised, reported unavailable to dispatch`,'bad'],
+      SENSOR:[`${n}: sensors disagree — frozen at ${Math.round(seg.h*75)} mm, alarm raised`,'bad'],
+      MAINT:[`${n}: maintenance lockout — triggers ignored`,'warn'],LOCKED:[`${n}: locked ${seg.h<=0?'flush':'raised'} by operations`,'warn'],TEST:[null,''],STUCK:[null,'']};
+    if(st==='LOWERING'&&!site.lock)S.act++;
+    if(st==='JAMMED'){evid({type:'FAULT',unit:n,detail:`Actuator jammed at ${Math.round(seg.h*75)} mm; unit locked`});bus('edge→platform',`FAULT JAM ${n}`)}
+    if(st==='FAILSAFE')evid({type:'FAULT',unit:n,detail:'Spring failsafe engaged'});
+    if(st==='UNAVAIL'){evid({type:'FAULT',unit:n,detail:'Pit flooded; reported unavailable to dispatch'});bus('edge→platform',`UNAVAILABLE ${n} reason=FLOOD`)}
+    if(st==='RAISED'&&seg.act){const a=seg.act;evid({type:'ACTUATION',unit:n,vehicle:a.label,plate:a.plate,inc:a.inc,kmh:a.kmh,actT:a.actT==null?'':+a.actT.toFixed(1),resetT:a.rs==null?'':+(S.t-a.rs).toFixed(1),detail:'Lowered for emergency vehicle and reset'});seg.act=null}
+    const m=M[st];if(m&&m[0]&&!(st==='RAISED'&&prev==='FAILSAFE'))log(m[0],m[1]);
+  }
+  // telemetry
+  seg.curT+=dt;if(seg.curT>=0.25){seg.curT=0;const moving=st==='LOWERING'||st==='RAISING'||st==='TEST';
+    const c=0.3+(moving?4+S.env.sand*3.5+(S.env.temp>60?0.6:0):0)+(Math.random()-0.5)*0.25;seg.cur.push(c);if(seg.cur.length>160)seg.cur.shift()}
+}
+function signalCtl(dt){
+  const g=sc.signal;if(!g)return;
+  const near=S.veh.some(v=>v.dispatch&&v.lane===g.lane&&(()=>{const d=distTo(v,g.x);return d<=320&&d>=-(v.len+3)})());
+  if(near&&S.light!=='green'){S.light='green';S.preT=0;log('Signal pre-emption: eastbound green for approaching ambulance','em');bus('platform→signal','PREEMPT EB green')}
+  else if(!near&&S.light==='green'){S.preT+=dt;if(S.preT>4){S.light='red';log('Pre-emption released — signal returns to normal plan')}}
+}
+function drive(v,dt){
+  let des=v.cruise;const pv=v.v;
+  if(v.hold&&S.t<v.hold)des=0;
+  for(const site of S.sites){const seg=site.segs[v.lane],d=distTo(v,site.x);
+    if(seg.h>0.15&&d<=(v.em?45:60)&&d>=-v.len)des=Math.min(des,4.2+Math.max(0,d)*0.32)}
+  const g=sc.signal;
+  if(g&&g.lane===v.lane&&S.light==='red'){const ds=(g.x-3-v.x)*v.dir-v.len/2;if(ds>=-0.5&&ds<45)des=Math.min(des,Math.max(0,ds*0.6))}
+  for(const p of S.peds){if(!p.on)continue;const lc=v.lane===1?0.25:0.75;if(Math.abs(p.p-lc)>0.4)continue;const ds=(p.x-v.x)*v.dir-v.len/2-1.5;if(ds>-1&&ds<40)des=Math.min(des,Math.max(0,ds*0.6))}
+  let best=1e9,lead=null;
+  for(const o of S.veh){if(o===v||o.lane!==v.lane||o.dir!==v.dir)continue;const gap=(o.x-v.x)*v.dir-(o.len+v.len)/2;if(gap>-1&&gap<best){best=gap;lead=o}}
+  if(lead)des=Math.min(des,Math.max(0,(best-2.5)/v.hw));
+  v.v+=Math.max(-7.5*dt,Math.min(v.acc*dt,des-v.v));if(v.v<0)v.v=0;
+  if(lead&&best<0.6)v.v=Math.min(v.v,lead.v);
+  v.brake=v.v<pv-0.02||(v.v<0.2&&des<0.5);
+  v.x+=v.v*dt*v.dir;
+  S.sites.forEach((site,i)=>{const s=(v.x-site.x)*v.dir;const p=v.prev[i];v.prev[i]=s;
+    if(p!==undefined&&p<0&&s>=0){const seg=site.segs[v.lane],h=seg.h,k=Math.round(v.v*3.6),n=segName(site,seg);
+      if(v.em){S.em=k;S.emLabel=v.label;const flush=h<0.1;
+        log(`${v.label} crossed ${site.name} at ${k} km/h — ${flush?'surface flush, no braking':'unit raised'}`,flush?'em':'bad');
+        const saved=flush?estSaved(v.cruise,v.acc):0;A.passages++;if(flush)A.flush++;A.saved.push({lbl:v.label,site:site.name,saved,flush});if(A.saved.length>40)A.saved.shift();
+        evid({type:'EMERGENCY PASSAGE',unit:n,vehicle:v.label,plate:v.plate,inc:v.inc,kmh:k,detail:flush?`Flush crossing, est. ${saved.toFixed(1)} s saved`:'Crossed raised unit'});
+        if(flush)seg.dnfUntil=S.t+6}
+      else if(h>0.5){S.civ.push(k);A.civ.push(k);if(A.civ.length>300)A.civ.shift()}
+      else{S.flatCiv++;
+        let why='accepted, no actuation under traffic',type='FLUSH CROSSING',extra='';
+        if(seg.stuck)why='calming lost (unit stuck flush)';
+        else if(site.lock)why=`unit locked flush (${site.lockLabel.split(' — ')[0]})`;
+        else if(seg.dnfUntil>S.t){why=`crossed flush behind emergency vehicle — plate ${v.plate} captured, evidence sent to police platform`;extra='enforcement'}
+        log(`${v.label} crossed ${site.name} at ${k} km/h — ${why}`,'warn');
+        evid({type,unit:n,vehicle:v.label,plate:v.plate,kmh:k,detail:why})}}});
+}
+function estSaved(v,a){const u=4.2,dBrake=(v*v-u*u)/(2*3.0),tB=(v-u)/3.0,dAcc=(v*v-u*u)/(2*a),tA=(v-u)/a;return Math.max(0,tB+tA-(dBrake+dAcc)/v)}
+function step(dt){
+  S.t+=dt;
+  const ev=sc.events||[];while(S.evI<ev.length&&ev[S.evI].t<=S.t){ev[S.evI].run(S);S.evI++}
+  while(S.spI<sc.spawns.length&&sc.spawns[S.spI].t<=S.t){if(!spawn(sc.spawns[S.spI]))break;S.spI++}
+  const pd=sc.peds||[];while(S.pdI<pd.length&&pd[S.pdI].t<=S.t){spawnPed(pd[S.pdI]);S.pdI++}
+  if(sc.live){for(const l of [0,1]){S.gen[l]-=dt;if(S.gen[l]<=0){const t=['car','car','suv','van'][Math.floor(Math.random()*4)];S.pend.push({type:t,lane:l,kmh:40+Math.random()*25,born:S.t});S.gen[l]=3+Math.random()*5}}}
+  S.pend=S.pend.filter(sp=>{const b=sp.born??S.t;if(b>S.t)return true;if(spawn(sp))return false;return S.t-b<6});
+  if(S.flooding){S.water=Math.min(1,S.water+dt*0.22)}else S.water=Math.max(0.05,S.water-dt*0.05);
+  S.sites.forEach(si=>{const was=si.flooded;si.flooded=S.water>0.7;if(was&&!si.flooded)log(si.name+': pit water back below limit — unit available');});
+  if(S.power==='battery')S.batt=Math.max(0,S.batt-dt*0.4);
+  if(S.env.temp>60&&!S.heatLog){S.heatLog=1;log('N1: road surface above 60 °C — heat derate, seals and electronics at rated limit','warn')}
+  for(const p of S.peds){if(p.p<1)p.p+=p.rate*dt;p.on=p.p>0.001&&p.p<1}
+  S.peds=S.peds.filter(p=>p.p<1.15);
+  for(const site of S.sites)for(const seg of site.segs)control(site,seg,dt);
+  signalCtl(dt);
+  for(const v of S.veh)drive(v,dt);
+  S.veh=S.veh.filter(v=>v.x>-30&&v.x<sc.len+30);
+}
+/* ====================================================================== rendering */
+let bgc=null,bgKey='',stripe=null,noise=null;
+function mk(w,h){const c=document.createElement('canvas');c.width=w;c.height=h;return c}
+function makePatterns(ctx){
+  const c=mk(16,16),g=c.getContext('2d');g.fillStyle='#1a1a1a';g.fillRect(0,0,16,16);g.strokeStyle='#f2b632';g.lineWidth=5;
+  g.beginPath();for(let i=-16;i<=32;i+=11){g.moveTo(i,0);g.lineTo(i+16,16)}g.stroke();stripe=ctx.createPattern(c,'repeat');
+  const n=mk(160,160),q=n.getContext('2d'),id=q.createImageData(160,160);
+  for(let i=0;i<id.data.length;i+=4){const v=Math.random()*70|0;id.data[i]=id.data[i+1]=id.data[i+2]=v+60;id.data[i+3]=Math.random()<0.5?26:8}
+  q.putImageData(id,0,0);noise=ctx.createPattern(n,'repeat');
+}
+function rng(seed){return()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function rr(c,x,y,w,h,r){c.beginPath();if(c.roundRect)c.roundRect(x,y,w,h,r);else c.rect(x,y,w,h)}
+function getView(){
+  const f=S.sites[clamp(focusSite,0,S.sites.length-1)];
+  if(cam==='zoom'){const len=Math.min(72,sc.len);return{x0:clamp(f.x-len/2,0,sc.len-len),len,zoom:true}}
+  return{x0:0,len:sc.len,zoom:false};
+}
+function geom(){
+  const v=getView(),sx=W/v.len,roadH=v.zoom?Math.min(0.36*H,19*sx):0.3*H,roadT=H*0.5-roadH/2-H*0.02,laneH=roadH/2,sw=H*0.055;
+  const P={v,sx,roadH,roadT,roadB:roadT+roadH,laneH,sw,X:m=>(m-v.x0)*sx,laneY:l=>l===1?roadT+laneH/2:roadT+laneH*1.5,
+    kv:v.zoom?1.12:2.3,bw:Math.max(v.zoom?3.4*sx:20,18),fs:Math.max(10,Math.min(15,W/88)),
+    lane0:{y0:roadT+laneH+5,hh:laneH-10},lane1:{y0:roadT+5,hh:laneH-10}};
+  P.lb=l=>l===1?P.lane1:P.lane0;return P;
+}
+function buildBG(P){
+  const key=[W,H,dpr,P.v.x0,P.v.len,sc.id,S.sites.length].join('|');if(key===bgKey&&bgc)return;bgKey=key;
+  bgc=mk(Math.round(W*dpr),Math.round(H*dpr));const c=bgc.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);makePatterns(c);
+  const R=rng(7),{roadT,roadB,sw,roadH,laneH,X,sx}=P;
+  // ground / buildings
+  let g=c.createLinearGradient(0,0,0,H);g.addColorStop(0,'#26261f');g.addColorStop(.5,'#2b2a24');g.addColorStop(1,'#25241f');c.fillStyle=g;c.fillRect(0,0,W,H);
+  const bld=(y0,y1,up)=>{let x=-20;while(x<W){const bw=70+R()*130,bh=(y1-y0)*(0.55+R()*0.4),by=up?y1-bh-sw*0.8:y0+sw*0.8;
+    const tone=40+R()*34;c.fillStyle=`rgb(${tone+8},${tone+4},${tone-2})`;c.fillRect(x,by,bw-8,bh);
+    c.fillStyle='rgba(255,255,255,.06)';c.fillRect(x,by,bw-8,2);c.strokeStyle='rgba(0,0,0,.35)';c.lineWidth=1;c.strokeRect(x+.5,by+.5,bw-9,bh-1);
+    for(let k=0;k<2+R()*3;k++){c.fillStyle='rgba(120,125,120,.45)';c.fillRect(x+10+R()*(bw-40),by+8+R()*Math.max(4,bh-30),14+R()*10,10)}
+    x+=bw}};
+  bld(0,roadT-sw,true);bld(roadB+sw,H,false);
+  // sidewalks + curbs
+  const walk=c.createLinearGradient(0,0,0,1);c.fillStyle='#7c7a72';c.fillRect(0,roadT-sw,W,sw);c.fillRect(0,roadB,W,sw);
+  c.fillStyle='rgba(0,0,0,.12)';for(let x=0;x<W;x+=26){c.fillRect(x,roadT-sw,1,sw);c.fillRect(x,roadB,1,sw)}
+  c.fillStyle='#a19f95';c.fillRect(0,roadT-3,W,3);c.fillRect(0,roadB,W,3);
+  c.fillStyle='rgba(0,0,0,.35)';c.fillRect(0,roadT,W,2);c.fillRect(0,roadB-2,W,2);
+  // trees + lamps
+  P.lamps=[];
+  for(let x=30+R()*40;x<W;x+=120+R()*90){const top=R()<0.5,y=top?roadT-sw*0.5:roadB+sw*0.5;
+    if(R()<0.5){c.fillStyle='rgba(20,50,25,.9)';c.beginPath();c.arc(x,y,sw*0.42,0,7);c.fill();c.fillStyle='rgba(60,110,55,.85)';c.beginPath();c.arc(x-2,y-2,sw*0.3,0,7);c.fill()}
+    else{c.fillStyle='#2a2f33';c.beginPath();c.arc(x,y,3,0,7);c.fill();P.lamps.push([x,y])}}
+  // asphalt
+  g=c.createLinearGradient(0,roadT,0,roadB);g.addColorStop(0,'#2d3236');g.addColorStop(.5,'#31373b');g.addColorStop(1,'#2b3034');c.fillStyle=g;c.fillRect(0,roadT,W,roadH);
+  c.fillStyle=noise;c.fillRect(0,roadT,W,roadH);
+  for(let i=0;i<60;i++){c.strokeStyle='rgba(0,0,0,.18)';c.lineWidth=1;const x=R()*W,y=roadT+R()*roadH;c.beginPath();c.moveTo(x,y);c.lineTo(x+10+R()*30,y+R()*4-2);c.stroke()}
+  // tyre-wear bands
+  for(const l of[0,1]){const y=P.laneY(l);for(const o of[-0.2,0.2]){c.fillStyle='rgba(0,0,0,.10)';c.fillRect(0,y+o*laneH-4,W,8)}}
+  // markings
+  c.strokeStyle='rgba(235,235,225,.8)';c.lineWidth=Math.max(2,sx*0.15);c.beginPath();c.moveTo(0,roadT+6);c.lineTo(W,roadT+6);c.moveTo(0,roadB-6);c.lineTo(W,roadB-6);c.stroke();
+  c.strokeStyle='#e0a92c';c.lineWidth=Math.max(2,sx*0.12);const my=roadT+laneH;c.beginPath();c.moveTo(0,my-3);c.lineTo(W,my-3);c.moveTo(0,my+3);c.lineTo(W,my+3);c.stroke();
+  // direction text
+  c.fillStyle='rgba(255,255,255,.16)';c.font=`600 ${P.fs*1.5}px "Barlow Condensed",sans-serif`;c.textBaseline='middle';c.textAlign='left';c.fillText('EB  →',10,P.laneY(0));c.textAlign='right';c.fillText('←  WB',W-10,P.laneY(1));
+  // site static: zebra, pit frame, drain, trench, sign
+  for(const site of S.sites){const cx=X(site.x),bw=P.bw;
+    if(sc.zebra){c.fillStyle='rgba(235,235,225,.55)';const zw=bw*1.9;for(let y=roadT+8;y<roadB-8;y+=sx*0.9+6){c.fillRect(cx-zw/2,y,zw,Math.max(4,sx*0.5))}}
+    // cable trench to cabinet
+    c.fillStyle='#1d2124';c.fillRect(cx+bw/2+4,roadB-1,5,sw*0.55);
+    for(const l of[0,1]){const b=P.lb(l);
+      c.fillStyle='#101416';rr(c,cx-bw/2-5,b.y0-3,bw+10,b.hh+6,4);c.fill();c.strokeStyle='#4a5258';c.lineWidth=1.5;c.stroke();
+      c.strokeStyle='rgba(255,255,255,.12)';c.lineWidth=1;for(let y=b.y0+4;y<b.y0+b.hh-3;y+=5){c.beginPath();c.moveTo(cx-bw/2-4,y);c.lineTo(cx-bw/2-1,y);c.moveTo(cx+bw/2+1,y);c.lineTo(cx+bw/2+4,y);c.stroke()}}
+    // warning sign (roadside)
+    const sxp=cx-bw/2-Math.max(30,sx*10)*(P.v.zoom?1:0.4),sy=roadB+sw*0.5;c.fillStyle='#d6a52c';c.beginPath();c.moveTo(sxp,sy-9);c.lineTo(sxp+9,sy+7);c.lineTo(sxp-9,sy+7);c.closePath();c.fill();c.strokeStyle='#111';c.lineWidth=1.2;c.stroke();
+    c.fillStyle='#111';c.fillRect(sxp-1,sy-3,2,6);}
+  // signal pole static
+  if(sc.signal){const gx=X(sc.signal.x-3);c.fillStyle='rgba(255,255,255,.85)';c.fillRect(gx-2,roadT+laneH+4,4,laneH-10)}
+}
+function lerp(a,b,t){return a+(b-a)*t}
+function drawVeh(c,v,P,labels){
+  const cx=P.X(v.x),cy=P.laneY(v.lane);if(cx<-80||cx>W+80)return;
+  let vl=Math.max(v.len*P.sx*P.kv,v.type==='bike'?18:30),vw=Math.min(vl*(v.type==='fire'?0.34:v.type==='bike'?0.3:v.type==='van'?0.4:0.42),P.laneH*0.66);
+  if(v.type==='bike'){vw=Math.min(vw,P.laneH*0.3)}
+  const t=S.t;
+  if(v.siren){for(let k=0;k<3;k++){const ph=((t*0.9+k/3)%1);c.beginPath();c.arc(cx,cy,vw*0.6+ph*P.laneH*1.8,0,7);c.strokeStyle=`rgba(255,93,82,${0.4*(1-ph)})`;c.lineWidth=1.5;c.stroke()}}
+  c.save();c.translate(cx,cy);if(v.dir<0)c.rotate(Math.PI);
+  const hl=vl/2,hw=vw/2;
+  if(v.type==='bike'){
+    c.fillStyle='rgba(0,0,0,.35)';c.beginPath();c.ellipse(1,2,hl,hw*0.7,0,0,7);c.fill();
+    c.strokeStyle='#161a1d';c.lineWidth=Math.max(2,vw*0.14);c.beginPath();c.moveTo(-hl,0);c.lineTo(hl,0);c.stroke();
+    c.strokeStyle='#cfd5d8';c.lineWidth=1.4;c.beginPath();c.moveTo(hl*0.55,-hw*1.1);c.lineTo(hl*0.55,hw*1.1);c.stroke();
+    c.fillStyle='#f0b27a';c.beginPath();c.arc(hl*0.05,0,hw*0.62,0,7);c.fill();c.fillStyle=v.color;c.beginPath();c.ellipse(-hl*0.1,0,hw*0.85,hw*1.15,0,0,7);c.fill();c.fillStyle='#e8f0f4';c.beginPath();c.arc(hl*0.18,0,hw*0.5,0,7);c.fill();
+    c.restore();return}
+  // shadow
+  c.fillStyle='rgba(0,0,0,.38)';rr(c,-hl+3,-hw+4,vl,vw,vw*0.22);c.fill();
+  // wheels
+  c.fillStyle='#0c0e10';for(const wx of[-hl*0.62,hl*0.55]){rr(c,wx-vl*0.075,-hw-1.5,vl*0.15,vw+3,2);c.fill()}
+  // body
+  const body=v.color,glass='rgba(14,24,32,.92)',roof=shade(body,14);
+  const g=c.createLinearGradient(0,-hw,0,hw);g.addColorStop(0,shade(body,26));g.addColorStop(.5,body);g.addColorStop(1,shade(body,-30));
+  c.fillStyle=g;rr(c,-hl,-hw,vl,vw,vw*0.28);c.fill();c.strokeStyle='rgba(0,0,0,.45)';c.lineWidth=1;c.stroke();
+  const trap=(x0,x1,h0,h1)=>{c.beginPath();c.moveTo(x0,-h0);c.lineTo(x1,-h1);c.lineTo(x1,h1);c.lineTo(x0,h0);c.closePath()};
+  const isBox=v.type==='amb'||v.type==='fire'||v.type==='van';
+  let barX=hl*0.1;
+  if(isBox){
+    const cab=hl*(v.type==='fire'?0.5:0.36);barX=cab+hl*0.02;
+    c.fillStyle=roof;rr(c,-hl*0.95,-hw*0.84,cab+hl*0.95-hl*0.04,vw*0.84,vw*0.12);c.fill();
+    c.fillStyle='rgba(0,0,0,.18)';c.fillRect(-hl*0.95,-hw*0.84,2,vw*0.84);
+    c.fillStyle=shade(body,-6);rr(c,cab,-hw*0.9,hl-cab-1,vw*0.9,vw*0.22);c.fill();
+    c.fillStyle=glass;trap(hl-vl*0.2,hl-vl*0.05,hw*0.72,hw*0.6);c.fill();
+    c.fillStyle='rgba(255,255,255,.08)';trap(hl-vl*0.2,hl-vl*0.05,hw*0.72,hw*0.1);c.fill();
+    c.fillStyle='rgba(14,24,32,.8)';c.fillRect(cab+vl*0.02,-hw*0.88,vl*0.08,vw*0.07);c.fillRect(cab+vl*0.02,hw*0.82,vl*0.08,vw*0.07);
+  }else{
+    c.fillStyle=roof;rr(c,-hl*0.28,-hw*0.72,hl*0.4,vw*0.72,vw*0.2);c.fill();
+    c.fillStyle=glass;trap(hl*0.12,hl*0.42,hw*0.68,hw*0.56);c.fill();trap(-hl*0.28,-hl*0.52,hw*0.64,hw*0.54);c.fill();
+    c.fillStyle='rgba(255,255,255,.08)';trap(hl*0.12,hl*0.42,hw*0.68,hw*0.05);c.fill();
+    c.strokeStyle='rgba(0,0,0,.22)';c.lineWidth=1;c.beginPath();c.moveTo(hl*0.55,-hw*0.55);c.lineTo(hl*0.55,hw*0.55);c.moveTo(-hl*0.62,-hw*0.55);c.lineTo(-hl*0.62,hw*0.55);c.stroke();
+  }
+  if(v.type==='amb'){c.fillStyle='#e23b33';c.fillRect(-hl*0.92,-hw*0.55,vl*0.44,vw*0.07);c.fillRect(-hl*0.92,hw*0.48,vl*0.44,vw*0.07);
+    c.fillStyle='#fff';c.fillRect(-hl*0.62,-hw*0.34,vl*0.16,vw*0.68);c.fillStyle='#e23b33';c.fillRect(-hl*0.58,-hw*0.26,vl*0.075,vw*0.52);c.fillRect(-hl*0.62+vl*0.01,-hw*0.1,vl*0.14,vw*0.2)}
+  if(v.type==='fire'){c.fillStyle='rgba(255,255,255,.85)';c.fillRect(-hl*0.95,-hw*0.1,vl*0.46,vw*0.2);
+    c.strokeStyle='#d7dbde';c.lineWidth=Math.max(1.5,vw*0.07);for(const o of[-0.3,0.3]){c.beginPath();c.moveTo(-hl*0.9,o*vw);c.lineTo(hl*0.42,o*vw);c.stroke()}
+    c.lineWidth=1;for(let k=0;k<9;k++){const x=-hl*0.85+k*vl*0.07;c.beginPath();c.moveTo(x,-vw*0.3);c.lineTo(x,vw*0.3);c.stroke()}
+    c.fillStyle='#b8bcc0';c.beginPath();c.arc(-hl*0.7,0,vw*0.1,0,7);c.fill()}
+  if(v.type==='police'){c.fillStyle='#233a8f';c.fillRect(-hl*0.9,-hw,vl*0.68,vw*0.14);c.fillRect(-hl*0.9,hw-vw*0.14,vl*0.68,vw*0.14);c.fillStyle='#233a8f';c.fillRect(-hl*0.7,-hw*0.06,vl*0.26,vw*0.12)}
+  // mirrors
+  c.fillStyle=shade(body,-34);c.fillRect(hl*0.3,-hw-2.5,vl*0.05,3.5);c.fillRect(hl*0.3,hw-1,vl*0.05,3.5);
+  // head / tail lights
+  c.fillStyle='#fff6c9';rr(c,hl-3.5,-hw+1.5,3.5,vw*0.2,1);c.fill();rr(c,hl-3.5,hw-1.5-vw*0.2,3.5,vw*0.2,1);c.fill();
+  c.fillStyle=v.brake?'#ff2d1f':'#8e1f19';rr(c,-hl,-hw+1.5,3.5,vw*0.2,1);c.fill();rr(c,-hl,hw-1.5-vw*0.2,3.5,vw*0.2,1);c.fill();
+  if(v.brake){c.save();c.globalCompositeOperation='lighter';c.fillStyle='rgba(255,40,30,.35)';c.fillRect(-hl-6,-hw+1,7,vw*0.3);c.fillRect(-hl-6,hw-1-vw*0.3,7,vw*0.3);c.restore()}
+  if(v.broken&&Math.floor(t*2.5)%2){c.fillStyle='#ffb000';for(const[x,y]of[[-hl-1,-hw],[-hl-1,hw-4],[hl-3,-hw],[hl-3,hw-4]])c.fillRect(x,y,4,4)}
+  // light bar
+  if(v.siren&&(v.type==='amb'||v.type==='fire'||v.type==='police')){const on=Math.floor(t*6)%2;
+    c.fillStyle='#1b2125';rr(c,barX-2,-hw*0.8,vl*0.075,vw*0.8,2);c.fill();c.fillStyle=on?'#ff3b30':'#3b7bff';c.fillRect(barX-1,-hw*0.76,vl*0.05,hw*0.74);c.fillStyle=on?'#3b7bff':'#ff3b30';c.fillRect(barX-1,hw*0.02,vl*0.05,hw*0.74)}
+  else if(v.siren){const on=Math.floor(t*6)%2;c.fillStyle=on?'#ff3b30':'#3b7bff';c.fillRect(hl*0.0,-hw*0.5,vl*0.05,hw*0.5);c.fillStyle=on?'#3b7bff':'#ff3b30';c.fillRect(hl*0.0,0,vl*0.05,hw*0.5)}
+  c.restore();
+  if(v.siren){const on=Math.floor(t*6)%2;c.save();c.globalCompositeOperation='lighter';const gr=c.createRadialGradient(cx,cy,0,cx,cy,vw*1.8);gr.addColorStop(0,on?'rgba(255,60,50,.35)':'rgba(60,120,255,.35)');gr.addColorStop(1,'rgba(0,0,0,0)');c.fillStyle=gr;c.beginPath();c.arc(cx,cy,vw*1.8,0,7);c.fill();c.restore()}
+  const k=Math.round(v.v*3.6);
+  labels.push({x:cx,y:cy-vw/2-4,t:v.em||v.type==='fire'||v.type==='amb'?`${v.label.split(' (')[0]} · ${k} km/h`:`${k} km/h`,col:v.em?'#ffb3ad':(k<=18?'#f2b632':'#e4ecef'),sub:P.v.zoom?v.plate:''});
+}
+function shade(hex,amt){const n=parseInt(hex.slice(1),16);let r=(n>>16)+amt,g=(n>>8&255)+amt,b=(n&255)+amt;r=clamp(r,0,255);g=clamp(g,0,255);b=clamp(b,0,255);return`rgb(${r},${g},${b})`}
+function ledCol(site,seg){
+  const t=S.t,blink=Math.floor(t*3)%2;
+  if(seg.state==='JAMMED'||seg.state==='FAILSAFE'||seg.state==='SENSOR'||seg.state==='UNAVAIL')return blink?'#ff5d52':'#4a1612';
+  if(seg.dnfUntil>t)return blink?'#ff3b30':'#5a1410';
+  if(seg.state==='LOWERING'||seg.state==='FLAT'||seg.state==='HOLD')return'blue';
+  if(seg.state==='MAINT')return blink?'#f2b632':'#4a3a10';
+  if(seg.state==='LOCKED'||seg.state==='STUCK')return'#38c6b2';
+  return'#f2b632';
+}
+function drawPlate(c,P,site,seg){
+  const cx=P.X(site.x),bw=P.bw,b=P.lb(seg.lane),h=seg.h,lift=h*(P.v.zoom?7:4),x=cx-bw/2,y=b.y0,w=bw,hh=b.hh;
+  // cast shadow
+  if(h>0.02){c.fillStyle=`rgba(0,0,0,${0.4*h})`;rr(c,x+lift*0.9,y+lift*1.2,w,hh,3);c.fill()}
+  const ex=lift*0.35;
+  // plate
+  const g=c.createLinearGradient(x-ex,0,x+w+ex,0);const L=lerp(46,92,h);
+  g.addColorStop(0,`rgb(${L*0.55},${L*0.55},${L*0.55})`);g.addColorStop(.35,`rgb(${L*1.1},${L*1.1},${L*1.05})`);g.addColorStop(.65,`rgb(${L*1.05},${L*1.05},${L})`);g.addColorStop(1,`rgb(${L*0.5},${L*0.5},${L*0.5})`);
+  c.fillStyle=g;rr(c,x-ex,y-ex,w+ex*2,hh+ex*2,3);c.fill();
+  c.globalAlpha=0.16+0.84*h;c.fillStyle=stripe;rr(c,x-ex+2,y-ex+2,w+ex*2-4,hh+ex*2-4,2);c.fill();c.globalAlpha=1;
+  // ramp shading
+  c.fillStyle=`rgba(255,255,255,${0.12*h})`;c.fillRect(x-ex+2,y-ex+2,(w+ex*2-4)*0.5,hh+ex*2-4);
+  c.fillStyle=`rgba(0,0,0,${0.22*h})`;c.fillRect(x+w/2,y-ex+2,(w/2+ex-2),hh+ex*2-4);
+  // anti-skid grid
+  c.strokeStyle='rgba(0,0,0,.25)';c.lineWidth=1;for(let yy=y+4;yy<y+hh-2;yy+=6){c.beginPath();c.moveTo(x+3,yy);c.lineTo(x+w-3,yy);c.stroke()}
+  const bad=seg.state==='FAILSAFE'||seg.state==='JAMMED'||seg.state==='SENSOR'||seg.state==='UNAVAIL';
+  c.strokeStyle=bad?'#ff5d52':(h<0.05?'#38c6b2':'#6b747a');c.lineWidth=1.8;rr(c,x-ex,y-ex,w+ex*2,hh+ex*2,3);c.stroke();
+  // flooded pit water
+  if(site.flooded||S.water>0.3){c.fillStyle=`rgba(70,130,200,${0.18+0.5*S.water*(1-h*0.5)})`;rr(c,x-ex,y-ex,w+ex*2,hh+ex*2,3);c.fill()}
+  // LED studs
+  const col=ledCol(site,seg),n=Math.max(4,Math.floor(hh/(P.v.zoom?12:9)));
+  for(const sxv of[x-ex+2,x+w+ex-2]){for(let i=0;i<n;i++){const yy=y-ex+4+(i+0.5)*(hh+ex*2-8)/n;let cc=col;
+    if(col==='blue'){const ph=(S.t*2.2-i/n)%1;cc=ph<0.35?'#6fa0ff':'#1a2f66'}
+    c.fillStyle=cc;c.shadowColor=cc;c.shadowBlur=P.v.zoom?7:4;c.beginPath();c.arc(sxv,yy,P.v.zoom?2.4:1.7,0,7);c.fill();c.shadowBlur=0}}
+  // jam step highlight
+  if(seg.state==='JAMMED'){c.strokeStyle='#ff5d52';c.setLineDash([4,3]);c.strokeRect(x-ex-3,y-ex-3,w+ex*2+6,hh+ex*2+6);c.setLineDash([])}
+}
+function drawPed(c,p,P){
+  if(p.p<=0)return;const y=P.roadT+clamp(p.p,0,1.1)*P.roadH,x=P.X(p.x),r=Math.max(6,P.sx*(P.v.zoom?0.7:1.25));
+  const sw=Math.sin(S.t*7+p.ph)*r*0.5;
+  c.fillStyle='rgba(0,0,0,.35)';c.beginPath();c.ellipse(x+2,y+3,r*1.1,r*0.8,0,0,7);c.fill();
+  c.fillStyle='#d9b08c';c.beginPath();c.arc(x+sw*0.3,y-r*0.9,r*0.4,0,7);c.fill();
+  c.fillStyle=['#e5533b','#3b8be5','#e5c33b','#58b86f'][Math.floor(p.ph)%4];c.beginPath();c.ellipse(x,y,r*0.95,r*0.55,0,0,7);c.fill();
+  c.strokeStyle='#2a2a2a';c.lineWidth=Math.max(1.5,r*0.3);c.beginPath();c.moveTo(x-sw,y+r*0.55);c.lineTo(x-sw*0.3,y+r*1.3);c.moveTo(x+sw,y+r*0.55);c.lineTo(x+sw*0.3,y+r*1.3);c.stroke();
+}
+function draw(){
+  if(!S||!W)return;
+  const P=geom();buildBG(P);
+  const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,W,H);
+  c.drawImage(bgc,0,0,W,H);
+  const{roadT,roadB,laneH,sw,X,sx,fs}=P,labels=[];
+  // geofences
+  for(const site of S.sites)for(const seg of site.segs){
+    const dir=seg.lane===0?1:-1,b=P.lb(seg.lane),a=X(site.x),e=X(site.x-dir*ST.geo);
+    if(seg.active){const g=c.createLinearGradient(a,0,e,0);g.addColorStop(0,'rgba(56,198,178,.26)');g.addColorStop(1,'rgba(56,198,178,.05)');c.fillStyle=g;c.fillRect(Math.min(a,e),b.y0,Math.abs(a-e),b.hh)}
+    c.strokeStyle=seg.active?'rgba(56,198,178,.9)':'rgba(255,255,255,.12)';c.setLineDash([4,5]);c.lineWidth=1.2;c.beginPath();c.moveTo(e,b.y0);c.lineTo(e,b.y0+b.hh);c.stroke();c.setLineDash([]);
+    if(seg.active){c.fillStyle='rgba(56,198,178,.95)';c.font=`500 ${fs*0.85}px "IBM Plex Mono",monospace`;c.textAlign='center';c.textBaseline=seg.lane===1?'top':'bottom';c.fillText(ST.geo+' m geofence',e,seg.lane===1?b.y0+2:b.y0+b.hh-2)}
+  }
+  // signal head
+  const sg=sc.signal;
+  if(sg){const px=X(sg.x)+6,py=roadB+H*0.012,lw=fs*1.3;rr(c,px,py,lw,lw*2.9,4);c.fillStyle='#111';c.fill();
+    [['red','#ff5d52'],['amber','#f2b632'],['green','#4fd18b']].forEach(([k,col],i)=>{c.beginPath();c.arc(px+lw/2,py+lw*0.5+i*lw*0.95,lw*0.33,0,7);c.fillStyle=S.light===k?col:'#2a2f33';c.fill()});
+    c.fillStyle='#c9d3d8';c.font=`500 ${fs*0.85}px "IBM Plex Mono",monospace`;c.textAlign='left';c.textBaseline='top';c.fillText('Signal',px+lw+5,py)}
+  // units
+  for(const site of S.sites){
+    const cx=X(site.x),bw=P.bw;
+    for(const seg of site.segs){drawPlate(c,P,site,seg);
+      const lab={RAISED:'RAISED',LOWERING:'LOWERING',FLAT:'FLUSH',WAIT:'HELD',HOLD:'FLUSH · WAIT',RAISING:'RAISING',FROZEN:'FROZEN',FAILSAFE:'FAILSAFE',JAMMED:'JAMMED',UNAVAIL:'UNAVAILABLE',SENSOR:'SENSOR FREEZE',MAINT:'MAINTENANCE',LOCKED:seg.h<=0?'LOCKED FLUSH':'LOCKED RAISED',STUCK:'STUCK FLUSH',TEST:'SELF-TEST'}[seg.state];
+      const col={RAISED:'#f2b632',FLAT:'#38c6b2',HOLD:'#38c6b2',LOWERING:'#5b93ff',RAISING:'#5b93ff',WAIT:'#f2b632',FROZEN:'#ff5d52',FAILSAFE:'#ff5d52',JAMMED:'#ff5d52',UNAVAIL:'#ff5d52',SENSOR:'#ff5d52',MAINT:'#f2b632',LOCKED:'#38c6b2',STUCK:'#ff5d52',TEST:'#5b93ff'}[seg.state];
+      labels.push({x:cx,y:seg.lane===1?roadT-sw-6:roadB+sw+6,t:lab,col,box:true,top:seg.lane===1,sz:0.82})}
+    // cabinet
+    const rx=cx+bw/2+8,ry=roadB+sw*0.62,cw=fs*1.6;
+    c.fillStyle='#596268';rr(c,rx,ry-fs*0.7,cw,fs*1.4,2);c.fill();c.fillStyle='#3a4248';c.fillRect(rx+2,ry-fs*0.7+2,cw-4,fs*0.35);
+    c.fillStyle=S.power==='fault'?'#ff5d52':S.power==='battery'?'#f2b632':'#38c6b2';c.beginPath();c.arc(rx+cw*0.78,ry+fs*0.2,fs*0.16,0,7);c.fill();
+    c.strokeStyle='#8c9ca5';c.lineWidth=1.3;c.beginPath();c.moveTo(rx+cw*0.25,ry-fs*0.7);c.lineTo(rx+cw*0.25,ry-fs*1.6);c.stroke();c.beginPath();c.arc(rx+cw*0.25,ry-fs*1.6,2.2,0,7);c.stroke();
+    c.fillStyle='#c9d3d8';c.font=`600 ${fs}px "Barlow Condensed",sans-serif`;c.textAlign='left';c.textBaseline='middle';c.fillText(site.name+(site.lock?' · '+(site.lock==='maint'?'MAINT':site.lock.toUpperCase()):''),rx+cw+5,ry);
+    for(const seg of site.segs){const v=seg.v2xVeh;if(!v)continue;
+      const vx=X(v.x),vy=P.laneY(v.lane),ax=rx+cw*0.25,ay=ry-fs*1.6;
+      c.strokeStyle='rgba(56,198,178,.85)';c.lineWidth=1.4;c.setLineDash([5,5]);c.lineDashOffset=-S.t*30;
+      c.beginPath();c.moveTo(vx,vy);c.quadraticCurveTo((vx+ax)/2,Math.max(vy,ay)+30,ax,ay);c.stroke();c.setLineDash([]);c.lineDashOffset=0}
+  }
+  for(const p of S.peds)drawPed(c,p,P);
+  for(const v of S.veh)drawVeh(c,v,P,labels);
+  // environment overlays
+  const mode=S.env.mode;
+  if(mode==='night'){
+    c.fillStyle='rgba(3,7,16,.6)';c.fillRect(0,0,W,H);
+    c.save();c.globalCompositeOperation='lighter';
+    for(const[lx,ly]of P.lamps||[]){const g=c.createRadialGradient(lx,ly,0,lx,ly,H*0.28);g.addColorStop(0,'rgba(255,205,120,.35)');g.addColorStop(1,'rgba(0,0,0,0)');c.fillStyle=g;c.beginPath();c.arc(lx,ly,H*0.28,0,7);c.fill()}
+    for(const v of S.veh){const cx=X(v.x),cy=P.laneY(v.lane),L=v.v>2?P.sx*38:P.sx*16,d=v.dir;const g=c.createLinearGradient(cx,0,cx+d*L,0);g.addColorStop(0,'rgba(255,240,200,.5)');g.addColorStop(1,'rgba(255,240,200,0)');
+      c.fillStyle=g;c.beginPath();c.moveTo(cx+d*P.sx*2,cy-4);c.lineTo(cx+d*L,cy-P.laneH*0.55);c.lineTo(cx+d*L,cy+P.laneH*0.55);c.lineTo(cx+d*P.sx*2,cy+4);c.fill()}
+    c.restore();
+    // keep LED studs readable
+    for(const site of S.sites)for(const seg of site.segs){const col=ledCol(site,seg),cx=P.X(site.x),b=P.lb(seg.lane);c.save();c.globalCompositeOperation='lighter';const gr=c.createRadialGradient(cx,b.y0+b.hh/2,0,cx,b.y0+b.hh/2,P.bw*1.3);gr.addColorStop(0,(col==='blue'?'rgba(80,130,255,.5)':col.startsWith('#')?hexA(col,.4):'rgba(240,180,50,.4)'));gr.addColorStop(1,'rgba(0,0,0,0)');c.fillStyle=gr;c.fillRect(cx-P.bw*1.4,b.y0-10,P.bw*2.8,b.hh+20);c.restore()}
+  }else if(mode==='sand'){
+    c.fillStyle='rgba(190,140,70,.34)';c.fillRect(0,0,W,H);c.strokeStyle='rgba(235,200,140,.5)';c.lineWidth=1;c.beginPath();
+    for(let i=0;i<160;i++){const x=((i*173.3+S.t*(90+i%7*20))%(W+80))-40,y=(i*97.7)%H;c.moveTo(x,y);c.lineTo(x+14+i%5*3,y+2)}c.stroke();
+    const g=c.createLinearGradient(0,0,W,0);g.addColorStop(0,'rgba(200,150,80,.2)');g.addColorStop(.5,'rgba(200,150,80,.0)');g.addColorStop(1,'rgba(200,150,80,.25)');c.fillStyle=g;c.fillRect(0,0,W,H);
+  }else if(mode==='rain'){
+    c.fillStyle='rgba(10,20,35,.38)';c.fillRect(0,0,W,H);c.strokeStyle='rgba(170,200,235,.45)';c.lineWidth=1;c.beginPath();
+    for(let i=0;i<260;i++){const x=(i*61.7+S.t*60)%(W+40),y=((i*43.3)+S.t*(520+i%9*40))%(H+30)-20;c.moveTo(x,y);c.lineTo(x-4,y+16)}c.stroke();
+    c.fillStyle='rgba(120,160,210,.08)';c.fillRect(0,P.roadT,W,P.roadH);
+  }
+  // labels
+  for(const l of labels){
+    c.font=`500 ${fs*(l.sz||0.85)}px "IBM Plex Mono",monospace`;c.textAlign='center';
+    const tw=c.measureText(l.t).width+10,th=fs*1.15;const lx=clamp(l.x,tw/2+2,W-tw/2-2);let bx=lx-tw/2,by=l.box?(l.top?l.y-th:l.y):l.y-th;
+    if(l.sub){c.font=`500 ${fs*0.72}px "IBM Plex Mono",monospace`}
+    c.fillStyle='rgba(11,16,19,.86)';rr(c,bx,by,tw,th,3);c.fill();c.textBaseline='middle';c.fillStyle=l.col;c.font=`500 ${fs*(l.sz||0.85)}px "IBM Plex Mono",monospace`;c.fillText(l.t,lx,by+th/2+0.5);
+    if(l.sub){c.font=`500 ${fs*0.72}px "IBM Plex Mono",monospace`;c.fillStyle='rgba(228,236,239,.7)';c.fillText(l.sub,lx,by-fs*0.45)}
+  }
+  // scale bar + power
+  const sb=50*sx,bx=14,by=H-14;c.strokeStyle='#c9d3d8';c.lineWidth=1.5;c.beginPath();c.moveTo(bx,by-5);c.lineTo(bx,by);c.lineTo(bx+sb,by);c.lineTo(bx+sb,by-5);c.stroke();
+  c.fillStyle='#c9d3d8';c.font=`500 ${fs*0.85}px "IBM Plex Mono",monospace`;c.textAlign='left';c.textBaseline='bottom';c.fillText('50 m',bx+sb+6,by+1);
+  c.textAlign='right';c.fillText((S.power==='grid'?'Power: grid':S.power==='battery'?`Power: battery ${Math.round(S.batt)}%`:'Controller: FAULT')+'  ·  '+S.env.temp.toFixed(0)+' °C  ·  pit water '+Math.round(S.water*100)+'%',W-14,by+1);
+}
+function hexA(h,a){const n=parseInt(h.slice(1),16);return`rgba(${n>>16},${n>>8&255},${n&255},${a})`}
+
+/* ====================================================================== panels */
+const cv=$('cv'),stage=$('stage');
+const STATE_UI={RAISED:['Raised','p-raised'],LOWERING:['Lowering','p-move'],FLAT:['Flush · holding','p-flat'],WAIT:['Lower held','p-hold'],HOLD:['Flush · awaiting clear','p-flat'],RAISING:['Raising','p-move'],FROZEN:['Frozen · vehicle in zone','p-bad'],FAILSAFE:['Failsafe raised','p-bad'],JAMMED:['Jammed · locked','p-bad'],UNAVAIL:['Unavailable · flooded','p-bad'],SENSOR:['Frozen · sensors disagree','p-bad'],MAINT:['Maintenance lockout','p-hold'],LOCKED:['Locked by operations','p-hold'],STUCK:['Stuck flush','p-bad'],TEST:['Self-test','p-move']};
+function fmtClock(){return `<span class="live"></span>T+${S.t.toFixed(1)} s`}
+function uiTop(){
+  const pw=S.power;
+  const pills=[[`Power: ${pw==='grid'?'grid':pw==='battery'?'battery '+Math.round(S.batt)+'%':'FAULT'}`,pw==='grid'?'':pw==='battery'?'warn':'bad'],[`Platform link ${S.link?'up':'lost'}`,S.link?'':'warn'],
+    [`Sensors ${S.disagree?'DISAGREE':'agree'}`,S.disagree?'bad':''],[`${S.sites.length} site${S.sites.length>1?'s':''} · ${S.sites.length*2} segments`,''],
+    [`${S.sites.filter(s=>s.lock).length?'Operator lock active':'No operator locks'}`,S.sites.some(s=>s.lock)?'warn':'']];
+  $('topStatus').innerHTML=pills.map(([t,k])=>`<span class="spill ${k}"><i></i>${t}</span>`).join('');
+  $('topClock').textContent=new Date().toLocaleString([], {dateStyle:'medium',timeStyle:'medium'});
+  $('logBadge').textContent=EV.length;
+}
+function ui(){
+  $('hudClock').innerHTML=fmtClock();
+  let fs=null,fsite=S.sites[clamp(focusSite,0,S.sites.length-1)];
+  for(const seg of fsite.segs)if(!fs&&(seg.active||(seg.sig.acoustic&&!seg.sig.disp&&!seg.sig.v2x)))fs=seg;
+  if(!fs)fs=fsite.segs[lane];
+  $('focusName').textContent=segName(fsite,fs);
+  const s=fs.sig,pw=S.power;
+  $('chips').innerHTML=[['Dispatch geofence',s.disp,'on'],['V2X credential',s.v2x,'on'],['Acoustic siren',s.acoustic,(s.disp||s.v2x)?'on':'warn'],['Zone clear',s.clear,'on'],
+    ['Confirmations '+(s.conf||0)+'/3',(s.conf||0)>=2&&(s.disp||s.v2x),'on'],['Sensors '+(S.disagree?'DISAGREE':'agree'),true,S.disagree?'bad':'on'],['Power: '+pw,true,pw==='grid'?'on':pw==='battery'?'warn':'bad'],['Platform link '+(S.link?'up':'lost'),true,S.link?'on':'warn']]
+    .map(([l,on,c])=>`<div class="chip ${on?c:''}"><b></b>${l}</div>`).join('');
+  $('segs').innerHTML=S.sites.flatMap(site=>site.segs.map(seg=>{const [t,c]=STATE_UI[seg.state];
+    return `<tr><td class="mono">${segName(site,seg)}</td><td><span class="pill ${c}">${t}</span></td><td><span class="bar"><i style="width:${Math.round(seg.h*100)}%"></i></span> <span class="mono">${Math.round(seg.h*75)} mm</span></td></tr>`})).join('');
+  const avg=S.civ.length?Math.round(S.civ.reduce((a,b)=>a+b,0)/S.civ.length):null;
+  $('kpis').innerHTML=[[S.em!=null?S.em+' km/h':'—',S.em!=null?S.emLabel+' crossing speed':'Emergency crossing speed'],[avg!=null?avg+' km/h':'—','Civilian avg over raised unit'],
+    [S.act,'Actuations'],[S.rej+(S.flatCiv?` · ${S.flatCiv}`:''),S.flatCiv?'Rejected · civilians crossed flush':'Unauthorised requests rejected']]
+    .map(([v,l])=>`<div class="kpi"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
+  if(logDirty){logDirty=false;$('log').innerHTML=S.log.map(e=>`<li class="${e.kind}"><span>${e.t.toFixed(1)}s</span>${esc(e.msg)}</li>`).join('')}
+  uiTop();
+}
+const esc=s=>String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+
+/* ---------- scenarios view ---------- */
+function renderScen(){
+  $('cover').innerHTML=`<span class="note" style="align-self:center">Use-case coverage ${[...COVERED].filter(c=>ALLCODES.includes(c)).length} of ${ALLCODES.length}:</span>`+ALLCODES.map(c=>`<span class="cov ${COVERED.has(c)?'y':'n'}" title="${COVERED.has(c)?'Simulated':'Not simulated yet'}">${c}</span>`).join('');
+  $('scenList').innerHTML=GROUPS.map((g,i)=>{const list=SC.filter(s=>s.g===i);if(!list.length)return'';
+    return `<div class="sgroup"><h2>${g}</h2><div class="scards">${list.map(s=>`<button class="scard" data-id="${s.id}"><div class="codes">${s.codes.length?s.codes.map(c=>`<span class="code">${c}</span>`).join(''):'<span class="code">Baseline</span>'}</div><b>${s.name}</b><p>${s.lead}</p></button>`).join('')}</div></div>`}).join('');
+}
+/* ---------- evidence view ---------- */
+function renderLog(){
+  const types=[...new Set(EV.map(e=>e.type))].sort(),sel=$('logType'),cur=sel.value;
+  sel.innerHTML='<option value="">All event types</option>'+types.map(t=>`<option ${t===cur?'selected':''}>${t}</option>`).join('');
+  const q=$('logQ').value.trim().toLowerCase(),t=sel.value;
+  const rows=EV.filter(e=>(!t||e.type===t)&&(!q||JSON.stringify(e).toLowerCase().includes(q))).slice(0,300);
+  $('logBody').innerHTML=rows.length?rows.map(e=>`<tr><td class="mono">${e.id}</td><td class="mono">${new Date(e.ts).toLocaleTimeString()}</td><td>${pill(e.type)}</td><td>${esc(e.scn)}</td><td class="mono">${esc(e.unit)}</td><td>${esc(e.vehicle)}</td><td class="mono">${esc(e.plate)}</td><td class="mono">${esc(e.inc)}</td><td>${esc(e.kmh)}</td><td>${esc(e.actT)}</td><td>${esc(e.resetT)}</td><td class="mono">${esc(e.clip)}</td><td>${esc(e.detail)}</td></tr>`).join(''):'<tr><td colspan="13" class="note">No records yet. Run a scenario or dispatch a vehicle.</td></tr>';
+  evDirty=false;
+}
+const pill=t=>`<span class="pill ${{ACTUATION:'p-move','EMERGENCY PASSAGE':'p-flat',REJECTED:'p-bad',FAULT:'p-bad','FLUSH CROSSING':'p-raised',OVERRIDE:'p-hold','SELF-TEST':'p-move'}[t]||'p-hold'}">${t}</span>`;
+function download(name,text,mime){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:mime}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
+function exportCsv(){const cols=['id','ts','type','scn','unit','vehicle','plate','inc','kmh','actT','resetT','clip','detail'];
+  const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;download('speed-breaker-evidence.csv',[cols.join(',')].concat(EV.map(e=>cols.map(c=>q(e[c])).join(','))).join('\n'),'text/csv')}
+/* ---------- analytics ---------- */
+function setupCanvas(cn){const r=cn.getBoundingClientRect(),d=Math.max(2,Math.min(3,window.devicePixelRatio||1));cn.width=Math.round(r.width*d);cn.height=Math.round(r.height*d);const c=cn.getContext('2d');c.setTransform(d,0,0,d,0,0);return[c,r.width,r.height]}
+function bars(cn,data,opts={}){
+  const[c,w,h]=setupCanvas(cn);c.clearRect(0,0,w,h);const pad={l:34,r:8,t:10,b:26};
+  const max=Math.max(opts.min||1,...data.map(d=>d.v))*1.15;
+  c.strokeStyle='#26323a';c.fillStyle='#8c9ca5';c.font='11px "IBM Plex Mono",monospace';c.textAlign='right';c.textBaseline='middle';
+  for(let i=0;i<=4;i++){const y=pad.t+(h-pad.t-pad.b)*(1-i/4);c.beginPath();c.moveTo(pad.l,y);c.lineTo(w-pad.r,y);c.stroke();c.fillText((max*i/4).toFixed(max>20?0:1),pad.l-5,y)}
+  if(!data.length){c.fillStyle='#8c9ca5';c.textAlign='center';c.fillText('No data yet',w/2,h/2);return}
+  const bw=Math.min(36,(w-pad.l-pad.r)/data.length*0.7),gap=(w-pad.l-pad.r)/data.length;
+  data.forEach((d,i)=>{const x=pad.l+gap*i+gap/2,bh=(h-pad.t-pad.b)*d.v/max;c.fillStyle=d.col||'#38c6b2';c.fillRect(x-bw/2,h-pad.b-bh,bw,bh);
+    c.fillStyle='#8c9ca5';c.textAlign='center';c.textBaseline='top';c.fillText(d.l,x,h-pad.b+5)});
+}
+function renderAna(){
+  const sv=A.saved.filter(x=>x.flush),avgS=sv.length?sv.reduce((a,b)=>a+b.saved,0)/sv.length:0,civAvg=A.civ.length?A.civ.reduce((a,b)=>a+b,0)/A.civ.length:0;
+  const rej=EV.filter(e=>e.type==='REJECTED').length,fl=EV.filter(e=>e.type==='FLUSH CROSSING').length;
+  const cal=A.civ.length?Math.round(A.civ.filter(k=>k<=25).length/A.civ.length*100):null;
+  $('tiles').innerHTML=[[A.passages,'Emergency passages'],[A.passages?Math.round(A.flush/A.passages*100)+'%':'—','Passed flush'],[sv.length?avgS.toFixed(1)+' s':'—','Avg est. seconds saved'],[civAvg?Math.round(civAvg)+' km/h':'—','Civilian avg over raised units'],[cal==null?'—':cal+'%','Civilians at or under 25 km/h'],[rej,'Rejected requests (stored)'],[fl,'Civilians crossed flush (stored)'],[EV.length,'Evidence records']]
+    .map(([v,l])=>`<div class="kpi"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
+  bars($('chSaved'),A.saved.slice(-12).map((x,i)=>({v:x.saved,l:x.site+'#'+(i+1),col:x.flush?'#38c6b2':'#ff5d52'})),{min:3});
+  const bins=[0,10,20,30,40,50,60,200],hist=bins.slice(0,-1).map((b,i)=>({v:A.civ.filter(k=>k>=b&&k<bins[i+1]).length,l:i===bins.length-2?b+'+':b+'-'+bins[i+1],col:b<25?'#f2b632':'#5b93ff'}));
+  bars($('chCiv'),hist,{min:3});
+  const tc={};EV.forEach(e=>tc[e.type]=(tc[e.type]||0)+1);bars($('chTypes'),Object.entries(tc).map(([k,v])=>({v,l:({'ACTUATION':'Actuat.','EMERGENCY PASSAGE':'Passage','REJECTED':'Rejected','FAULT':'Fault','FLUSH CROSSING':'Flush','OVERRIDE':'Override','SELF-TEST':'Test'})[k]||k.slice(0,8),col:'#5b93ff'})),{min:3});
+}
+/* ---------- health ---------- */
+function spark(cn,arr,min,max,col){const[c,w,h]=setupCanvas(cn);c.clearRect(0,0,w,h);c.strokeStyle='#26323a';c.strokeRect(.5,.5,w-1,h-1);if(arr.length<2)return;
+  c.strokeStyle=col;c.lineWidth=1.5;c.beginPath();arr.forEach((v,i)=>{const x=i/(159)*w,y=h-4-(h-8)*(v-min)/(max-min);i?c.lineTo(x,y):c.moveTo(x,y)});c.stroke()}
+function renderHealth(){
+  const g=$('healthGrid');
+  if(g.children.length!==S.sites.length*2||g.dataset.sc!==sc.id){g.dataset.sc=sc.id;g.innerHTML=S.sites.flatMap(site=>site.segs.map(seg=>`<div class="card" data-k="${site.name}${seg.lane}"><h3>${segName(site,seg)}<em></em></h3><div class="rows"></div><canvas height="60" style="width:100%;height:60px;margin-top:6px"></canvas><div class="btnrow" style="margin-top:8px"><button class="btn sm" data-test="${site.name}|${seg.lane}">Run self-test</button></div></div>`)).join('')}
+  S.sites.forEach(site=>site.segs.forEach(seg=>{
+    const el=g.querySelector(`[data-k="${site.name}${seg.lane}"]`);if(!el)return;
+    const avgAct=seg.actTimes.length?seg.actTimes.reduce((a,b)=>a+b,0)/seg.actTimes.length:null,drift=avgAct?Math.round((avgAct/ST.lowerT-1)*100):null;
+    const cur=seg.cur.length?seg.cur[seg.cur.length-1]:0,base=4+S.env.sand*3.5;
+    const [t,k]=STATE_UI[seg.state];el.querySelector('em').innerHTML=`<span class="pill ${k}">${t}</span>`;
+    el.querySelector('.rows').innerHTML=[['Cycle count',seg.cycles.toLocaleString()],['Actuation time (avg)',avgAct?avgAct.toFixed(2)+' s'+(drift>20?` (+${drift}% drift)`:''):'—'],['Motor current',cur.toFixed(1)+' A'],['Sand level',Math.round(S.env.sand*100)+'%'],['Surface temperature',S.env.temp.toFixed(0)+' °C'+(S.env.temp>60?' · derated':'')],
+      ['Battery',S.power==='grid'?'100% (float)':Math.round(S.batt)+'%'],['Pit water',Math.round(S.water*100)+'%'],['Tamper sensor','closed'],['Last self-test',seg.lastTest?`${seg.lastTest.low.toFixed(1)} s, +${seg.lastTest.pct}% current`:'none this session'],
+      ['Service flag',(drift>25||S.env.sand>0.7||base>6)?'<b style="color:var(--amber)">Service soon</b>':'OK']].map(([a,b])=>`<div class="hrow"><span>${a}</span><span class="mono">${b}</span></div>`).join('');
+    spark(el.querySelector('canvas'),seg.cur,0,12,'#38c6b2')}));
+}
+/* ---------- settings ---------- */
+function field(id,label,min,max,step,val,unit,help){return `<div class="field"><label for="${id}">${label}</label><output id="${id}o">${val}${unit}</output><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${val}" data-unit="${unit}"><small>${help}</small></div>`}
+function renderSet(){
+  $('setCtl').innerHTML=field('s_geo','Dispatch geofence',60,220,5,ST.geo,' m','At 80 km/h a vehicle covers about 22 m per second. Detection plus lowering needs 4 to 5 s plus margin.')+
+   field('s_v2x','V2X range',80,250,5,ST.v2x,' m','Roadside unit radio range for emergency priority messages.')+
+   field('s_ac','Acoustic range',60,220,5,ST.ac,' m','Secondary confirmation only; never triggers on its own.')+
+   field('s_lowerT','Lowering time',1,5,0.1,ST.lowerT,' s','Nominal time from raised to flush at 20 °C and no sand.')+
+   field('s_raiseT','Raising time',1,6,0.1,ST.raiseT,' s','Slower than lowering so a late vehicle can still be detected.')+
+   field('s_clearDelay','Zone-clear hold before raising',0.5,4,0.5,ST.clearDelay,' s','Raising needs a confirmed clear zone for this long, never a timer alone.')+
+   field('s_margin','Arrival safety margin',0,3,0.1,ST.margin,' s','If a vehicle arrives sooner than lowering time plus this, the unit stays raised.');
+  $('setEnv').innerHTML=field('e_sand','Sand level in housing',0,100,5,Math.round(S.env.sand*100),'%','Slows actuation and raises motor current. Above 70% a service flag appears.')+
+   field('e_temp','Road surface temperature',20,70,1,S.env.temp,' °C','Above 60 °C heat derate applies (seal, fluid and electronics rating).')+
+   `<div class="lbl">Weather and light</div><div class="btnrow" id="envBtns">${['day','night','sand','rain'].map(m=>`<button class="btn sm ${S.env.mode===m?'on':''}" data-env="${m}">${m==='sand'?'Sandstorm':m==='rain'?'Heavy rain':m[0].toUpperCase()+m.slice(1)}</button>`).join('')}</div>`;
+}
+function renderBus(){$('bus').innerHTML=BUS.length?BUS.map(b=>`<li class="${b.ok?'':'bad'}"><span>${b.t.toFixed(1)}s</span>${esc(b.dir)} · ${esc(b.msg)} · sig ${b.sig}${b.ok?'':' · REJECTED'}</li>`).join(''):'<li class="empty note">No messages yet.</li>';busDirty=false}
+
+/* ====================================================================== controls */
+function load(id){
+  sc=id==='live'?LIVE:(SC.find(s=>s.id===id)||SC[0]);reset();
+  cam=sc.cam||'over';focusSite=0;lane=0;
+  $('siteSel').innerHTML=S.sites.map((s,i)=>`<option value="${i}">Site ${s.name}</option>`).join('');$('siteSel').value=0;
+  syncSegs();
+  $('hudName').innerHTML=sc.name+(sc.codes.length?`<small>${sc.codes.join(' · ')}</small>`:'');
+  $('modeTag').textContent=sc.live?'sandbox':'scripted test';
+  $('desc').innerHTML=`<div class="codes">${sc.codes.length?sc.codes.map(c=>`<span class="code">${c}</span>`).join(''):`<span class="code">${sc.live?'Sandbox':'Baseline'}</span>`}</div><p>${sc.lead}</p><ul>${sc.watch.map(w=>`<li>${w}</li>`).join('')}</ul>`;
+  try{history.replaceState(null,'','#'+sc.id)}catch(_){}
+  bgKey='';resize();ui();draw();if(view==='set')renderSet();
+}
+function syncSegs(){
+  document.querySelectorAll('#camSeg button').forEach(b=>b.classList.toggle('on',b.dataset.cam===cam));
+  document.querySelectorAll('#laneSeg button').forEach(b=>b.classList.toggle('on',+b.dataset.lane===lane));
+}
+function setPlaying(p){playing=p;$('play').textContent=p?'Pause':'Play';stage.classList.toggle('paused',!p)}
+function showView(v){
+  view=v;document.querySelectorAll('.view').forEach(e=>e.hidden=e.id!=='v-'+v);
+  document.querySelectorAll('#nav button').forEach(b=>b.setAttribute('aria-selected',b.dataset.view===v));
+  if(v==='ops'){bgKey='';resize()}
+  if(v==='scen')renderScen();if(v==='log')renderLog();if(v==='ana')renderAna();if(v==='health')renderHealth();if(v==='set'){renderSet();renderBus()}
+}
+function dispatch(kind){
+  const L=lane,common={lane:L,born:S.t};let n=S.nid;
+  const add=o=>S.pend.push({...common,...o});
+  if(kind==='amb')add({type:'amb',kmh:80,...EMV,label:'Ambulance A'+n,status:'enroute'});
+  else if(kind==='fire')add({type:'fire',kmh:70,...EMV,label:'Fire truck F'+n});
+  else if(kind==='police')add({type:'police',kmh:90,tag:true,siren:true,hw:1.2,label:'Police P'+n});
+  else if(kind==='car')add({type:['car','suv','van'][n%3],kmh:50});
+  else if(kind==='tail'){add({type:'amb',kmh:80,...EMV,label:'Ambulance A'+n});S.pend.push({...common,type:'car',kmh:80,hw:0.45,label:'Tailgating car',born:S.t+0.62,x:undefined})}
+  else if(kind==='fake')add({type:'car',kmh:65,siren:true,hw:1.5,label:'Car with aftermarket siren',color:'#7f8f9a'});
+  else if(kind==='clone')add({type:'car',kmh:60,tag:true,forged:'clone',hw:1.5,label:'Car with cloned tag',color:'#7f8f9a'});
+  else if(kind==='replay')add({type:'car',kmh:60,tag:true,forged:'replay',hw:1.5,label:'Car replaying a recorded message',color:'#7f8f9a'});
+  else if(kind==='ret')add({type:'amb',kmh:70,tag:true,status:'returning',hw:1.5,label:'Ambulance (returning, lights off)'});
+  else if(kind==='bike')add({type:'bike',kmh:15,label:'Cyclist'});
+  else if(kind==='ped'){spawnPed({off:(Math.random()-0.5)*3,rate:0.17});toast('Pedestrian started crossing at site '+S.sites[focusSite].name);return}
+  toast('Dispatched: '+kind);
+}
+function inject(k){
+  const site=S.sites[focusSite],seg=site.segs[lane];
+  if(k==='grid'){S.power='battery';log('Grid supply lost — controller running on battery backup','warn');evid({type:'FAULT',detail:'Grid supply lost, battery backup active'})}
+  else if(k==='fault'){S.power='fault';log('Controller fault detected — maintenance alarm sent to operations','bad');evid({type:'FAULT',detail:'Controller fault, spring failsafe holds unit raised'})}
+  else if(k==='power'){S.power='grid';S.batt=100;log('Power restored — controller back on grid','em')}
+  else if(k==='link'){S.link=false;log('Platform link lost — edge controller continues on V2X + siren','warn');evid({type:'FAULT',detail:'Platform link lost'})}
+  else if(k==='linkup'){S.link=true;log('Platform link restored','em')}
+  else if(k==='jam'){seg.jam=true}
+  else if(k==='stuck'){seg.stuck=true;seg.h=0;log(`${segName(site,seg)} stuck flush — calming lost, priority repair raised`,'bad');evid({type:'FAULT',unit:segName(site,seg),detail:'Stuck flush: calming lost'})}
+  else if(k==='sens'){S.disagree=!S.disagree;log(S.disagree?'Radar and camera disagree — freeze position and raise alarm':'Sensors agree again — normal operation resumes',S.disagree?'bad':'em');if(S.disagree)evid({type:'FAULT',detail:'Sensors disagree: radar vs camera'})}
+  else if(k==='flood'){S.flooding=!S.flooding;log(S.flooding?'Rain: pit water level rising':'Pit pump running — water level falling','warn')}
+  else if(k==='sand'){S.env.sand=0.8;S.env.temp=63;log('Surface 63 °C, sand level 80% — heat derate active, actuation slower','warn')}
+  else if(k==='clear'){S.power='grid';S.batt=100;S.link=true;S.disagree=false;S.flooding=false;S.env.sand=0.03;S.env.temp=41;S.heatLog=0;S.sites.forEach(s=>{s.lock=null;s.segs.forEach(g=>{g.jam=false;g.stuck=false})});log('All injected faults cleared','em')}
+  logDirty=true;
+}
+function resize(){
+  const r=stage.getBoundingClientRect();W=r.width;H=r.height;if(!W)return;
+  const raw=window.devicePixelRatio||1;dpr=clamp(Math.max(2,raw),1,3);while(W*H*dpr*dpr>9e6&&dpr>1.25)dpr-=0.25;
+  cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);bgKey='';draw();
+}
+$('nav').addEventListener('click',e=>{const b=e.target.closest('button');if(b)showView(b.dataset.view)});
+$('scenList').addEventListener('click',e=>{const b=e.target.closest('.scard');if(!b)return;load(b.dataset.id);setPlaying(true);showView('ops')});
+$('play').onclick=()=>setPlaying(!playing);
+$('restart').onclick=()=>{load(sc.id);setPlaying(true)};
+$('speedSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;speed=+b.dataset.speed;document.querySelectorAll('#speedSeg button').forEach(x=>x.classList.toggle('on',x===b))});
+$('camSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;cam=b.dataset.cam;syncSegs();bgKey='';draw()});
+$('laneSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;lane=+b.dataset.lane;syncSegs()});
+$('siteSel').onchange=e=>{focusSite=+e.target.value;bgKey='';draw()};
+$('envSel').onchange=e=>{S.env.mode=e.target.value;envOverride=e.target.value;draw()};
+$('full').onclick=()=>{try{const p=document.fullscreenElement?document.exitFullscreen():stage.requestFullscreen();p&&p.catch&&p.catch(()=>{})}catch(_){}};
+$('ovr').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const site=S.sites[focusSite],m=b.dataset.lock;
+  setLock(site,m||null,{flush:`Operator lock: ${site.name} locked flush from operations`,raised:`Operator lock: ${site.name} locked raised from operations`,maint:`Maintenance: crew lockout on ${site.name}`,'':`Operator lock released on ${site.name}`}[m])});
+$('cmdLower').onclick=()=>platformCmd(S,'one',S.sites[focusSite],S.sites[focusSite].segs[lane]);
+$('cmdAll').onclick=()=>platformCmd(S,'all');
+$('disp').addEventListener('click',e=>{const b=e.target.closest('button');if(b)dispatch(b.dataset.d)});
+$('inj').addEventListener('click',e=>{const b=e.target.closest('button');if(b)inject(b.dataset.i)});
+$('logType').onchange=renderLog;$('logQ').oninput=renderLog;$('logCsv').onclick=exportCsv;
+$('logJson').onclick=()=>download('speed-breaker-evidence.json',JSON.stringify(EV,null,2),'application/json');
+$('logClear').onclick=()=>{if(confirm('Delete all stored evidence records in this browser?')){EV=[];saveEV();renderLog();uiTop()}};
+$('v-health').addEventListener('click',e=>{const b=e.target.closest('[data-test]');if(!b)return;const[sn,l]=b.dataset.test.split('|'),site=S.sites.find(s=>s.name===sn);
+  if(!selfTest(site.segs[+l]))toast('Self-test needs a raised unit and an empty zone')});
+$('v-set').addEventListener('input',e=>{const t=e.target;if(t.type!=='range')return;const v=+t.value,o=$(t.id+'o');if(o)o.textContent=v+(t.dataset.unit||'');
+  if(t.id.startsWith('s_')){ST[t.id.slice(2)]=v;saveST()}else if(t.id==='e_sand')S.env.sand=v/100;else if(t.id==='e_temp'){S.env.temp=v;if(v<=60)S.heatLog=0}});
+$('v-set').addEventListener('click',e=>{const b=e.target.closest('[data-env]');if(!b)return;S.env.mode=b.dataset.env;$('envSel').value=b.dataset.env;renderSet()});
+$('setReset').onclick=()=>{ST={...DEF};saveST();renderSet()};
+addEventListener('keydown',e=>{if(e.code==='Space'&&view==='ops'&&!/INPUT|TEXTAREA|BUTTON|SELECT/.test(document.activeElement.tagName)){e.preventDefault();setPlaying(!playing)}});
+new ResizeObserver(resize).observe(stage);
+
+let last=performance.now(),acc=0;
+function frame(now){
+  const dt=Math.min(0.1,(now-last)/1000);last=now;
+  if(playing){
+    if(S.t>=sc.dur){endHold+=dt;if(endHold>1.5){const k=sc.id;load(k)}}
+    else{acc+=dt*speed;let n=0;while(acc>=1/60&&n++<30){step(1/60);acc-=1/60}}
+  }
+  if(view==='ops'){draw();if(now-lastUi>100){lastUi=now;ui()}}
+  else if(now-lastUi>400){lastUi=now;uiTop();if(view==='log'&&evDirty)renderLog();if(view==='health')renderHealth();if(view==='set'&&busDirty)renderBus()}
+  requestAnimationFrame(frame);
+}
+window.SSB={load,step:n=>{for(let i=0;i<n;i++)step(1/60)},state:()=>S,scenarios:SC,dispatch,inject,ev:()=>EV,setView:showView,setPlaying};
+const hash=(location.hash||'').slice(1);
+const hashed=SC.find(s=>s.id===hash);
+load(hashed?hashed.id:'live');
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
