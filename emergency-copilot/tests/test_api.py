@@ -16,7 +16,7 @@ def test_manual_call_flow_and_ws(client):
     cid = client.post("/api/calls", json={"caller_number": "+9715"}).json()["call_id"]
     with client.websocket_connect(f"/ws/calls/{cid}") as ws:
         assert ws.receive_json()["state"]["call_id"] == cid
-        r = client.post(f"/api/calls/{cid}/segments", json={"text": "fire at Al Wasl Road, people trapped", "final": True})
+        r = client.post(f"/api/calls/{cid}/segments", json={"text": "fire at Hamdan Street, people trapped", "final": True})
         assert r.status_code == 200
         state = ws.receive_json()["state"]
         assert state["fields"]["incident_type"]["value"] == "Fire" and "trapped" in state["cues"]
@@ -36,7 +36,7 @@ def test_scenario_stream_and_wall(client):
             break
         time.sleep(0.05)
     assert s["severity"]["level"] == "P1" and s["dialect"] == "gulf" and s["code_switched"]
-    assert client.get("/api/calls").json()[0]["location"] == "Sheikh Zayed Road"
+    assert client.get("/api/calls").json()[0]["location"] == "Sheikh Zayed bin Sultan Street"
     m = client.get("/api/metrics").json()
     assert m["processing_ms"]["count"] > 5 and m["processing_ms"]["p95"] < 800
 
@@ -44,7 +44,7 @@ def test_scenario_stream_and_wall(client):
 def test_admin_audit_shadow_report(client):
     cid = client.post("/api/calls", json={"scenario": "en_cardiac", "speed": 200}).json()["call_id"]
     time.sleep(1.0)
-    client.post(f"/api/calls/{cid}/truth", json={"incident_type": "MEDICAL", "location": "Al Wasl Road", "cues": ["not_breathing"]})
+    client.post(f"/api/calls/{cid}/truth", json={"incident_type": "MEDICAL", "location": "Hamdan Street", "cues": ["not_breathing"]})
     rep = client.get("/api/shadow/report").json()
     assert rep["incident_accuracy"] == 1.0 and rep["cue_recall"] == 1.0 and rep["gate_pass"] is True
     assert client.post("/api/admin/mode", json={"mode": "shadow"}).json() == {"mode": "shadow"}

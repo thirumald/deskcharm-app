@@ -3,6 +3,8 @@ const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const store = { get: (k) => { try { return localStorage.getItem(k) || ""; } catch { return ""; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
 let KEY = store.get("copilot_key");
+let cfg = { tile_url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png", attribution: "© OpenStreetMap contributors", center: [24.4539, 54.3773], zoom: 11 };
+let lmap = null, gazLayer = null, candLayer = null, lastPin = "";
 let callId = null, ws = null, S = null, wallWs = null, gaz = [], lastCueCount = 0;
 
 async function api(path, opts = {}) {
@@ -18,6 +20,7 @@ document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () 
 function showTab(name) {
   document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
   document.querySelectorAll(".view").forEach((v) => v.classList.toggle("hidden", v.id !== name));
+  if (name === "taker" && lmap) setTimeout(() => lmap.invalidateSize(), 50);
   if (name === "wall") openWall();
   if (name === "admin") loadAdmin();
 }
@@ -27,6 +30,7 @@ async function init() {
   const sc = await api("/api/scenarios");
   $("#scenario").innerHTML = sc.map((s) => `<option value="${esc(s.id)}">${esc(s.title)}</option>`).join("");
   gaz = await api("/api/gazetteer");
+  try { cfg = await api("/api/config"); } catch {}
   const q = new URLSearchParams(location.search).get("call");
   if (q) connect(q);
 }
@@ -134,19 +138,31 @@ function beep() {
   try { const a = new (window.AudioContext || window.webkitAudioContext)(), o = a.createOscillator(); o.frequency.value = 880; o.connect(a.destination); o.start(); o.stop(a.currentTime + 0.15); } catch {}
 }
 function drawMap() {
-  const W = 300, H = 220, pad = 16;
-  const lats = gaz.map((g) => g.lat), lons = gaz.map((g) => g.lon);
-  if (!lats.length) return;
+  const cands = S.candidates || [];
+  $("#cands").innerHTML = cands.length ? cands.map((c, i) => `${i === 0 ? "<b>" : ""}${esc(c.name)} ${Math.round(c.confidence * 100)}%${i === 0 ? "</b>" : ""}${c.note ? " · " + esc(c.note) : ""}`).join("<br>") : "No location yet.";
+  if (!window.L) { $("#leaflet").classList.add("hidden"); $("#map").classList.remove("hidden"); return drawSchematic(cands); }
+  if (!lmap) {
+    lmap = L.map("leaflet", { zoomControl: true }).setView(cfg.center, cfg.zoom);
+    L.tileLayer(cfg.tile_url, { maxZoom: 19, attribution: cfg.attribution }).addTo(lmap);
+    gazLayer = L.layerGroup().addTo(lmap); candLayer = L.layerGroup().addTo(lmap);
+    gaz.forEach((g) => L.circleMarker([g.lat, g.lon], { radius: 4, color: "#64748b", weight: 1, fillOpacity: 0.7 }).bindTooltip(`${g.name} · ${g.name_ar}`).addTo(gazLayer));
+  }
+  candLayer.clearLayers();
+  cands.forEach((c, i) => {
+    const col = i === 0 ? "#ef4444" : "#f59e0b";
+    L.circleMarker([c.lat, c.lon], { radius: i === 0 ? 10 : 7, color: col, weight: 3, fillColor: col, fillOpacity: 0.35 })
+      .bindTooltip(`${c.name} ${Math.round(c.confidence * 100)}%`, { permanent: i === 0 }).addTo(candLayer);
+  });
+  if (S.aml) L.circle([S.aml.lat, S.aml.lon], { radius: S.aml.accuracy_m || 100, color: "#3b82f6", weight: 1, fillOpacity: 0.12 }).addTo(candLayer);
+  const key = cands[0] ? `${S.call_id}:${cands[0].name}` : "";
+  if (key && key !== lastPin) { lastPin = key; lmap.setView([cands[0].lat, cands[0].lon], 14); }
+}
+function drawSchematic(cands) {
+  const W = 300, H = 220, pad = 16, lats = gaz.map((g) => g.lat), lons = gaz.map((g) => g.lon);
   const [la0, la1, lo0, lo1] = [Math.min(...lats), Math.max(...lats), Math.min(...lons), Math.max(...lons)];
   const px = (lo) => pad + ((lo - lo0) / (lo1 - lo0 || 1)) * (W - 2 * pad), py = (la) => H - pad - ((la - la0) / (la1 - la0 || 1)) * (H - 2 * pad);
-  let svg = gaz.map((g) => `<circle cx="${px(g.lon)}" cy="${py(g.lat)}" r="3" fill="#8b98a5"><title>${esc(g.name)}</title></circle>`).join("");
-  const cands = S.candidates || [];
-  svg += cands.map((c, i) => {
-    const col = i === 0 ? "#ef4444" : "#f59e0b";
-    return `<circle cx="${px(c.lon)}" cy="${py(c.lat)}" r="${i === 0 ? 8 : 6}" fill="${col}" fill-opacity=".35" stroke="${col}" stroke-width="2"><title>${esc(c.name)} ${Math.round(c.confidence * 100)}%</title></circle>`;
-  }).join("");
-  $("#map").innerHTML = svg;
-  $("#cands").innerHTML = cands.length ? cands.map((c, i) => `${i === 0 ? "<b>" : ""}${esc(c.name)} ${Math.round(c.confidence * 100)}%${i === 0 ? "</b>" : ""}${c.note ? " · " + esc(c.note) : ""}`).join("<br>") : "No location yet. Schematic map, no tiles (works offline).";
+  $("#map").innerHTML = gaz.map((g) => `<circle cx="${px(g.lon)}" cy="${py(g.lat)}" r="3" fill="#8b98a5"><title>${esc(g.name)}</title></circle>`).join("")
+    + cands.map((c, i) => `<circle cx="${px(c.lon)}" cy="${py(c.lat)}" r="${i ? 6 : 8}" fill="${i ? "#f59e0b" : "#ef4444"}" fill-opacity=".4"><title>${esc(c.name)}</title></circle>`).join("");
 }
 
 // -------------------------------------------------------------- supervisor wall

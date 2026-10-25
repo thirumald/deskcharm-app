@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Emergency Call Co-Pilot</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -47,7 +48,8 @@
 
     <section class="card col">
       <h2>Location</h2>
-      <svg id="map" viewBox="0 0 300 220" role="img" aria-label="Location map"></svg>
+      <div id="leaflet" aria-label="Abu Dhabi map"></div>
+      <svg id="map" class="hidden" viewBox="0 0 300 220" role="img" aria-label="Schematic fallback map"></svg>
       <div id="cands" class="muted"></div>
       <h2>Next question</h2>
       <div id="nextQ" class="nextq">–</div>
@@ -76,6 +78,7 @@
     <section class="card"><h2>Audit trail <span id="auditOk"></span></h2><div class="audit"><table id="auditTable"><tbody></tbody></table></div><button id="refreshAudit">Refresh</button></section>
   </div>
 </main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

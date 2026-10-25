@@ -20,7 +20,7 @@ def test_ai_never_writes_cad_without_human_accept(orch):
     assert st.fields["incident_type"].meta["type"] == "MEDICAL" and st.severity.level == "P1"
     assert orch.cad.records == {}
     orch.field_action("T1", "location", "accept")
-    assert orch.cad.records["T1"]["fields"] == {"location": "Al Wasl Road"}
+    assert orch.cad.records["T1"]["fields"] == {"location": "Hamdan Street"}
 
 
 def test_edit_reject_and_no_overwrite(orch):
@@ -47,7 +47,7 @@ def test_cues_raised_once_and_audited(orch):
 def test_sop_checklist_progresses(orch):
     st = orch.start_call("T2")
     assert st.next_question["id"] == "what"
-    orch.ingest(Segment(call_id="T2", speaker="caller", text="my father is not breathing at Al Wasl Road", final=True))
+    orch.ingest(Segment(call_id="T2", speaker="caller", text="my father is not breathing at Hamdan Street", final=True))
     done = {i.slot for i in orch.calls["T2"].checklist if i.done}
     assert {"incident", "location", "conscious_breathing"} <= done
     assert orch.calls["T2"].next_question["id"] in {"callback", "age", "problem", "persons"}
@@ -57,8 +57,8 @@ def test_sop_checklist_progresses(orch):
 def test_low_asr_confidence_lowers_field_confidence(orch):
     orch.start_call("A")
     orch.start_call("B")
-    orch.ingest(Segment(call_id="A", text="fire at Al Wasl Road", final=True, confidence=0.95))
-    orch.ingest(Segment(call_id="B", text="fire at Al Wasl Road", final=True, confidence=0.4))
+    orch.ingest(Segment(call_id="A", text="fire at Hamdan Street", final=True, confidence=0.95))
+    orch.ingest(Segment(call_id="B", text="fire at Hamdan Street", final=True, confidence=0.4))
     assert orch.calls["B"].fields["location"].confidence < orch.calls["A"].fields["location"].confidence
 
 

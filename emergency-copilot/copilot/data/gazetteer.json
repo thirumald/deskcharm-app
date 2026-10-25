@@ -1,31 +1,276 @@
 {
-  "_note": "DEMO DATA ONLY. Approximate coordinates; replace with the client's authoritative gazetteer (GIS import).",
-  "entries": [
-    {"id": "szr", "type": "street", "name": "Sheikh Zayed Road", "name_ar": "شارع الشيخ زايد", "lat": 25.2048, "lon": 55.2708,
-     "aliases": ["sheikh zayed road", "shaikh zayed road", "sheikh zayed", "shaikh zaid", "sheikh zaid road", "شارع الشيخ زايد", "الشيخ زايد", "شارع الشيخ زيد"]},
-    {"id": "wasl", "type": "street", "name": "Al Wasl Road", "name_ar": "شارع الوصل", "lat": 25.2005, "lon": 55.2455,
-     "aliases": ["al wasl road", "wasl road", "al wasl", "alwasl road", "شارع الوصل", "طريق الوصل", "الوصل"]},
-    {"id": "jbr", "type": "street", "name": "Jumeirah Beach Road", "name_ar": "شارع الجميرا", "lat": 25.2140, "lon": 55.2530,
-     "aliases": ["jumeirah beach road", "jumeira beach road", "jumeirah road", "jumeira road", "شارع الجميرا", "طريق الجميرا", "الجميرا", "جميرا"]},
-    {"id": "quoz", "type": "district", "name": "Al Quoz", "name_ar": "القوز", "lat": 25.1380, "lon": 55.2330,
-     "aliases": ["al quoz", "alquoz", "al qouz", "القوز"]},
-    {"id": "deira", "type": "district", "name": "Deira", "name_ar": "ديرة", "lat": 25.2697, "lon": 55.3095,
-     "aliases": ["deira", "dera", "ديرة", "ديره"]},
-    {"id": "barsha", "type": "district", "name": "Al Barsha", "name_ar": "البرشاء", "lat": 25.1124, "lon": 55.2000,
-     "aliases": ["al barsha", "albarsha", "barsha", "البرشاء", "البرشا"]},
-    {"id": "karama", "type": "district", "name": "Al Karama", "name_ar": "الكرامة", "lat": 25.2480, "lon": 55.3070,
-     "aliases": ["al karama", "karama", "alkarama", "الكرامة", "كرامة"]},
-    {"id": "nahda", "type": "district", "name": "Al Nahda", "name_ar": "النهدة", "lat": 25.2890, "lon": 55.3700,
-     "aliases": ["al nahda", "nahda", "النهدة", "النهضة"]},
-    {"id": "bbay", "type": "district", "name": "Business Bay", "name_ar": "الخليج التجاري", "lat": 25.1860, "lon": 55.2630,
-     "aliases": ["business bay", "الخليج التجاري", "بزنس بي"]},
-    {"id": "dmall", "type": "landmark", "name": "Dubai Mall", "name_ar": "دبي مول", "lat": 25.1972, "lon": 55.2797,
-     "aliases": ["dubai mall", "the dubai mall", "دبي مول"]},
-    {"id": "moe", "type": "landmark", "name": "Mall of the Emirates", "name_ar": "مول الإمارات", "lat": 25.1181, "lon": 55.2007,
-     "aliases": ["mall of the emirates", "mall of emirates", "مول الامارات", "مول الإمارات"]},
-    {"id": "creek", "type": "landmark", "name": "Dubai Creek Park", "name_ar": "منتزه خور دبي", "lat": 25.2415, "lon": 55.3320,
-     "aliases": ["dubai creek park", "creek park", "منتزه خور دبي", "خور دبي"]},
-    {"id": "hospital", "type": "landmark", "name": "Rashid Hospital", "name_ar": "مستشفى راشد", "lat": 25.2330, "lon": 55.3190,
-     "aliases": ["rashid hospital", "rashed hospital", "مستشفى راشد"]}
-  ]
+ "_note": "DEMO DATA ONLY. Approximate Abu Dhabi coordinates; replace with the client's authoritative gazetteer (GIS import).",
+ "entries": [
+  {
+   "id": "sbs",
+   "type": "street",
+   "name": "Sheikh Zayed bin Sultan Street",
+   "name_ar": "شارع الشيخ زايد بن سلطان",
+   "lat": 24.4803,
+   "lon": 54.3598,
+   "aliases": [
+    "sheikh zayed bin sultan street",
+    "sheikh zayed street",
+    "shaikh zayed street",
+    "sheikh zayed road",
+    "shaikh zayed road",
+    "sheikh zayed the first street",
+    "شارع الشيخ زايد بن سلطان",
+    "شارع الشيخ زايد",
+    "الشيخ زايد"
+   ]
+  },
+  {
+   "id": "hamdan",
+   "type": "street",
+   "name": "Hamdan Street",
+   "name_ar": "شارع حمدان",
+   "lat": 24.488,
+   "lon": 54.366,
+   "aliases": [
+    "hamdan street",
+    "hamdan st",
+    "sheikh hamdan street",
+    "شارع حمدان",
+    "حمدان"
+   ]
+  },
+  {
+   "id": "airport",
+   "type": "street",
+   "name": "Airport Road",
+   "name_ar": "شارع المطار",
+   "lat": 24.456,
+   "lon": 54.383,
+   "aliases": [
+    "airport road",
+    "airport street",
+    "شارع المطار",
+    "طريق المطار"
+   ]
+  },
+  {
+   "id": "corniche",
+   "type": "street",
+   "name": "Corniche Road",
+   "name_ar": "الكورنيش",
+   "lat": 24.472,
+   "lon": 54.34,
+   "aliases": [
+    "corniche road",
+    "corniche",
+    "cornish",
+    "al corniche",
+    "شارع الكورنيش",
+    "الكورنيش",
+    "كورنيش"
+   ]
+  },
+  {
+   "id": "khalidiya",
+   "type": "district",
+   "name": "Al Khalidiyah",
+   "name_ar": "الخالدية",
+   "lat": 24.472,
+   "lon": 54.347,
+   "aliases": [
+    "al khalidiyah",
+    "khalidiyah",
+    "khalidiya",
+    "al khalidiya",
+    "الخالدية"
+   ]
+  },
+  {
+   "id": "bateen",
+   "type": "district",
+   "name": "Al Bateen",
+   "name_ar": "البطين",
+   "lat": 24.456,
+   "lon": 54.335,
+   "aliases": [
+    "al bateen",
+    "bateen",
+    "al batin",
+    "البطين"
+   ]
+  },
+  {
+   "id": "mushrif",
+   "type": "district",
+   "name": "Al Mushrif",
+   "name_ar": "المشرف",
+   "lat": 24.45,
+   "lon": 54.385,
+   "aliases": [
+    "al mushrif",
+    "mushrif",
+    "المشرف"
+   ]
+  },
+  {
+   "id": "mussafah",
+   "type": "district",
+   "name": "Mussafah",
+   "name_ar": "مصفح",
+   "lat": 24.347,
+   "lon": 54.498,
+   "aliases": [
+    "mussafah",
+    "musaffah",
+    "mussafa",
+    "مصفح",
+    "المصفح"
+   ]
+  },
+  {
+   "id": "khalifacity",
+   "type": "district",
+   "name": "Khalifa City",
+   "name_ar": "مدينة خليفة",
+   "lat": 24.419,
+   "lon": 54.58,
+   "aliases": [
+    "khalifa city",
+    "madinat khalifa",
+    "مدينة خليفة"
+   ]
+  },
+  {
+   "id": "reem",
+   "type": "district",
+   "name": "Al Reem Island",
+   "name_ar": "جزيرة الريم",
+   "lat": 24.4985,
+   "lon": 54.4057,
+   "aliases": [
+    "al reem island",
+    "reem island",
+    "الريم",
+    "جزيرة الريم"
+   ]
+  },
+  {
+   "id": "maryah",
+   "type": "district",
+   "name": "Al Maryah Island",
+   "name_ar": "جزيرة المارية",
+   "lat": 24.5012,
+   "lon": 54.3892,
+   "aliases": [
+    "al maryah island",
+    "maryah island",
+    "al maryah",
+    "جزيرة المارية",
+    "المارية"
+   ]
+  },
+  {
+   "id": "saadiyat",
+   "type": "district",
+   "name": "Saadiyat Island",
+   "name_ar": "جزيرة السعديات",
+   "lat": 24.544,
+   "lon": 54.433,
+   "aliases": [
+    "saadiyat island",
+    "saadiyat",
+    "السعديات",
+    "جزيرة السعديات"
+   ]
+  },
+  {
+   "id": "yasisl",
+   "type": "district",
+   "name": "Yas Island",
+   "name_ar": "جزيرة ياس",
+   "lat": 24.4672,
+   "lon": 54.6037,
+   "aliases": [
+    "yas island",
+    "yas",
+    "جزيرة ياس",
+    "ياس"
+   ]
+  },
+  {
+   "id": "mosque",
+   "type": "landmark",
+   "name": "Sheikh Zayed Grand Mosque",
+   "name_ar": "جامع الشيخ زايد الكبير",
+   "lat": 24.4128,
+   "lon": 54.475,
+   "aliases": [
+    "sheikh zayed grand mosque",
+    "grand mosque",
+    "zayed grand mosque",
+    "جامع الشيخ زايد الكبير",
+    "جامع الشيخ زايد",
+    "الجامع الكبير"
+   ]
+  },
+  {
+   "id": "marina",
+   "type": "landmark",
+   "name": "Marina Mall",
+   "name_ar": "مارينا مول",
+   "lat": 24.476,
+   "lon": 54.32,
+   "aliases": [
+    "marina mall",
+    "مارينا مول"
+   ]
+  },
+  {
+   "id": "yasmall",
+   "type": "landmark",
+   "name": "Yas Mall",
+   "name_ar": "ياس مول",
+   "lat": 24.4885,
+   "lon": 54.607,
+   "aliases": [
+    "yas mall",
+    "ياس مول"
+   ]
+  },
+  {
+   "id": "wahda",
+   "type": "landmark",
+   "name": "Al Wahda Mall",
+   "name_ar": "الوحدة مول",
+   "lat": 24.472,
+   "lon": 54.372,
+   "aliases": [
+    "al wahda mall",
+    "wahda mall",
+    "الوحدة مول"
+   ]
+  },
+  {
+   "id": "skmc",
+   "type": "landmark",
+   "name": "Sheikh Khalifa Medical City",
+   "name_ar": "مدينة الشيخ خليفة الطبية",
+   "lat": 24.464,
+   "lon": 54.364,
+   "aliases": [
+    "sheikh khalifa medical city",
+    "skmc",
+    "مدينة الشيخ خليفة الطبية"
+   ]
+  },
+  {
+   "id": "ccad",
+   "type": "landmark",
+   "name": "Cleveland Clinic Abu Dhabi",
+   "name_ar": "كليفلاند كلينك أبوظبي",
+   "lat": 24.5018,
+   "lon": 54.388,
+   "aliases": [
+    "cleveland clinic abu dhabi",
+    "cleveland clinic",
+    "كليفلاند كلينك"
+   ]
+  }
+ ]
 }

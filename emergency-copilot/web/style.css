@@ -45,3 +45,5 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:6px 8px;
 tr.row{cursor:pointer}tr.row:hover{background:var(--bg)}
 pre{white-space:pre-wrap;font-size:12px;margin:0 0 8px}.audit{max-height:360px;overflow:auto}.audit td{font-size:12px;padding:3px 6px}
 footer{padding:4px 0;font-size:12px}
+#leaflet{height:280px;border:1px solid var(--line);border-radius:8px;z-index:0}
+.leaflet-container{background:var(--bg)}

@@ -161,6 +161,13 @@ def create_app(var_dir: Path | None = None, cad: CADAdapter | None = None, mode:
     def vocabulary():
         return orch.location.gaz.hotwords()
 
+    @app.get("/api/config")
+    def config():
+        """Map settings. Point COPILOT_TILE_URL at an on-premise tile server for air-gapped centres."""
+        return {"tile_url": os.environ.get("COPILOT_TILE_URL", "https://tile.openstreetmap.org/{z}/{x}/{y}.png"),
+                "attribution": os.environ.get("COPILOT_TILE_ATTRIBUTION", "© OpenStreetMap contributors"),
+                "center": [24.4539, 54.3773], "zoom": 11}
+
     @app.get("/api/gazetteer", dependencies=protected)
     def gazetteer():
         return [{k: e[k] for k in ("id", "name", "name_ar", "type", "lat", "lon")} for e in orch.location.gaz.entries]

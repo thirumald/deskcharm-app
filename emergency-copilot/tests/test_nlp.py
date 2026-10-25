@@ -60,8 +60,8 @@ def test_dialect_and_code_switch():
 
 
 @pytest.mark.parametrize("text,name", [
-    ("we are on Shaikh Zaid road", "Sheikh Zayed Road"), ("near dera", "Deira"), ("بالكرامة", "Al Karama"),
-    ("في شارع الشيخ زايد", "Sheikh Zayed Road"), ("I'm at the mall of emirates", "Mall of the Emirates"),
+    ("we are on Shaikh Zaid road", "Sheikh Zayed bin Sultan Street"), ("near the cornish", "Corniche Road"), ("بالخالدية", "Al Khalidiyah"),
+    ("في شارع الشيخ زايد", "Sheikh Zayed bin Sultan Street"), ("I am at the yas mall", "Yas Mall"),
 ])
 def test_location_fuzzy(text, name):
     assert LocationEngine().resolve(text)[0].name == name
@@ -70,8 +70,8 @@ def test_location_fuzzy(text, name):
 def test_location_no_false_positive_and_aml_fusion():
     L = LocationEngine()
     assert L.resolve("I need help at my house please") == []
-    c = L.resolve("al wasl road", {"lat": 25.2008, "lon": 55.2458, "accuracy_m": 40})
-    assert c[0].name == "Al Wasl Road" and "corroborated" in c[0].note
-    far = L.resolve("al wasl road", {"lat": 25.5, "lon": 55.6, "accuracy_m": 40})
+    c = L.resolve("hamdan street", {"lat": 24.4883, "lon": 54.3664, "accuracy_m": 40})
+    assert c[0].name == "Hamdan Street" and "corroborated" in c[0].note
+    far = L.resolve("hamdan street", {"lat": 24.9, "lon": 55.0, "accuracy_m": 40})
     assert far[0].source == "aml" and "conflicts" in next(x for x in far if x.source == "speech").note
-    assert L.resolve("nothing here", {"lat": 25.2, "lon": 55.2, "accuracy_m": 50})[0].source == "aml"
+    assert L.resolve("nothing here", {"lat": 24.45, "lon": 54.38, "accuracy_m": 50})[0].source == "aml"
