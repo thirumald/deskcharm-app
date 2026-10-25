@@ -1,0 +1,31 @@
+{
+  "_note": "DEMO DATA ONLY. Approximate coordinates; replace with the client's authoritative gazetteer (GIS import).",
+  "entries": [
+    {"id": "szr", "type": "street", "name": "Sheikh Zayed Road", "name_ar": "شارع الشيخ زايد", "lat": 25.2048, "lon": 55.2708,
+     "aliases": ["sheikh zayed road", "shaikh zayed road", "sheikh zayed", "shaikh zaid", "sheikh zaid road", "شارع الشيخ زايد", "الشيخ زايد", "شارع الشيخ زيد"]},
+    {"id": "wasl", "type": "street", "name": "Al Wasl Road", "name_ar": "شارع الوصل", "lat": 25.2005, "lon": 55.2455,
+     "aliases": ["al wasl road", "wasl road", "al wasl", "alwasl road", "شارع الوصل", "طريق الوصل", "الوصل"]},
+    {"id": "jbr", "type": "street", "name": "Jumeirah Beach Road", "name_ar": "شارع الجميرا", "lat": 25.2140, "lon": 55.2530,
+     "aliases": ["jumeirah beach road", "jumeira beach road", "jumeirah road", "jumeira road", "شارع الجميرا", "طريق الجميرا", "الجميرا", "جميرا"]},
+    {"id": "quoz", "type": "district", "name": "Al Quoz", "name_ar": "القوز", "lat": 25.1380, "lon": 55.2330,
+     "aliases": ["al quoz", "alquoz", "al qouz", "القوز"]},
+    {"id": "deira", "type": "district", "name": "Deira", "name_ar": "ديرة", "lat": 25.2697, "lon": 55.3095,
+     "aliases": ["deira", "dera", "ديرة", "ديره"]},
+    {"id": "barsha", "type": "district", "name": "Al Barsha", "name_ar": "البرشاء", "lat": 25.1124, "lon": 55.2000,
+     "aliases": ["al barsha", "albarsha", "barsha", "البرشاء", "البرشا"]},
+    {"id": "karama", "type": "district", "name": "Al Karama", "name_ar": "الكرامة", "lat": 25.2480, "lon": 55.3070,
+     "aliases": ["al karama", "karama", "alkarama", "الكرامة", "كرامة"]},
+    {"id": "nahda", "type": "district", "name": "Al Nahda", "name_ar": "النهدة", "lat": 25.2890, "lon": 55.3700,
+     "aliases": ["al nahda", "nahda", "النهدة", "النهضة"]},
+    {"id": "bbay", "type": "district", "name": "Business Bay", "name_ar": "الخليج التجاري", "lat": 25.1860, "lon": 55.2630,
+     "aliases": ["business bay", "الخليج التجاري", "بزنس بي"]},
+    {"id": "dmall", "type": "landmark", "name": "Dubai Mall", "name_ar": "دبي مول", "lat": 25.1972, "lon": 55.2797,
+     "aliases": ["dubai mall", "the dubai mall", "دبي مول"]},
+    {"id": "moe", "type": "landmark", "name": "Mall of the Emirates", "name_ar": "مول الإمارات", "lat": 25.1181, "lon": 55.2007,
+     "aliases": ["mall of the emirates", "mall of emirates", "مول الامارات", "مول الإمارات"]},
+    {"id": "creek", "type": "landmark", "name": "Dubai Creek Park", "name_ar": "منتزه خور دبي", "lat": 25.2415, "lon": 55.3320,
+     "aliases": ["dubai creek park", "creek park", "منتزه خور دبي", "خور دبي"]},
+    {"id": "hospital", "type": "landmark", "name": "Rashid Hospital", "name_ar": "مستشفى راشد", "lat": 25.2330, "lon": 55.3190,
+     "aliases": ["rashid hospital", "rashed hospital", "مستشفى راشد"]}
+  ]
+}
