@@ -1,0 +1,32 @@
+# Local dev stack: PostgreSQL (PostGIS + TimescaleDB + ltree) and the .NET API.
+# The React console runs separately:  cd frontend && npm install && VITE_API_URL=/ npm run dev
+services:
+  db:
+    image: timescale/timescaledb-ha:pg17
+    environment:
+      POSTGRES_USER: sentinel
+      POSTGRES_PASSWORD: sentinel
+      POSTGRES_DB: sentinel
+    ports: ["5432:5432"]
+    volumes:
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+      - pgdata:/home/postgres/pgdata/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sentinel -d sentinel"]
+      interval: 5s
+      retries: 20
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: src/Sentinel.Api/Dockerfile
+    environment:
+      ConnectionStrings__Postgres: Host=db;Port=5432;Database=sentinel;Username=sentinel;Password=sentinel
+      Auth__SigningKey: ${SENTINEL_SIGNING_KEY:-dev-only-change-me-dev-only-change-me-32b}
+      Cors__Origins__0: http://localhost:5173
+    depends_on:
+      db: { condition: service_healthy }
+    ports: ["8080:8080"]
+
+volumes:
+  pgdata:
