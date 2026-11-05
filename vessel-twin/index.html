@@ -56,6 +56,14 @@
   </div>
 
   <div class="card">
+    <h2>Live AIS (AISStream)</h2>
+    <input id="aisKey" type="password" placeholder="AISStream API key" style="width:100%;padding:6px;background:#0b1620;color:#e6eef5;border:1px solid #28506f;border-radius:6px" />
+    <div style="margin-top:8px"><button id="aisBtn">Connect</button> <span id="aisSt" class="badge">off</span></div>
+    <div class="row"><span>Live vessels</span><b id="aisN">0</b></div>
+    <small>Gulf of Oman / Arabian Gulf box. Key stays in your browser. If the connection fails, AISStream may block browser origins; use a small relay server then.</small>
+  </div>
+
+  <div class="card">
     <h2>Simulation</h2>
     <button id="play">Pause</button>
     <div class="row" style="margin-top:8px"><span>Time speed</span><b id="tsV">1×</b></div>
@@ -196,6 +204,36 @@ async function loadData(){
   }
   updateIdx();
 }
+// ---- Live AIS (AISStream websocket) -------------------------------------------
+const AIS_BOX=[[[22,48],[30,60]]]; // lat,lon SW/NE: Arabian Gulf + Gulf of Oman
+const live=new Map(); let ws=null;
+const liveLayer=L.layerGroup().addTo(map);
+try{$("aisKey").value=localStorage.getItem("aisKey")||""}catch(e){}
+function aisStatus(t,c){$("aisSt").textContent=t;$("aisSt").className="badge "+(c||"")}
+function aisDisconnect(){if(ws){ws.close();ws=null}}
+function aisConnect(){
+  const key=$("aisKey").value.trim(); if(!key)return aisStatus("enter key","sample");
+  try{localStorage.setItem("aisKey",key)}catch(e){}
+  aisDisconnect(); aisStatus("connecting…");
+  ws=new WebSocket("wss://stream.aisstream.io/v0/stream");
+  ws.onopen=()=>ws.send(JSON.stringify({APIKey:key,BoundingBoxes:AIS_BOX,FilterMessageTypes:["PositionReport"]}));
+  ws.onmessage=async ev=>{
+    let m; try{m=JSON.parse(typeof ev.data==="string"?ev.data:await ev.data.text())}catch(e){return}
+    if(m.error){aisStatus("error: "+m.error,"sample");return}
+    const r=m.Message&&m.Message.PositionReport; if(!r)return;
+    aisStatus("live","live");
+    const id=r.UserID, name=((m.MetaData&&m.MetaData.ShipName)||"").trim()||"MMSI "+id, ll=[r.Latitude,r.Longitude];
+    let v=live.get(id);
+    if(!v){v={m:L.circleMarker(ll,{radius:4,color:"#fff",weight:1,fillColor:"#f87171",fillOpacity:1}).addTo(liveLayer)};live.set(id,v)}
+    v.m.setLatLng(ll).unbindTooltip().bindTooltip(`${name}<br>${r.Sog} kn · COG ${r.Cog}°`);
+    v.t=Date.now(); $("aisN").textContent=live.size;
+  };
+  ws.onerror=()=>aisStatus("failed (browser blocked?)","sample");
+  ws.onclose=()=>{if(ws)aisStatus("closed")};
+}
+$("aisBtn").onclick=()=>{if(ws){aisDisconnect();aisStatus("off");$("aisBtn").textContent="Connect"}else{aisConnect();$("aisBtn").textContent="Disconnect"}};
+setInterval(()=>{const c=Date.now()-30*60e3;for(const[id,v]of live)if(v.t<c){v.m.remove();live.delete(id)}$("aisN").textContent=live.size},60e3);
+
 loadData();
 requestAnimationFrame(frame);
 </script>
