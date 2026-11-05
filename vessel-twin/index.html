@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Vessel Digital Twin – UAE</title>
+<link rel="stylesheet" href="vendor/leaflet.css" />
+<style>
+  :root { --bg:#0b1620; --panel:#112231; --ink:#e6eef5; --mute:#8ba3b8; --acc:#2dd4bf; --warn:#fbbf24; --bad:#f87171; }
+  * { box-sizing:border-box }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--ink); font:14px/1.4 system-ui,sans-serif }
+  #app { display:grid; grid-template-columns:320px 1fr; height:100% }
+  aside { background:var(--panel); padding:16px; overflow:auto; border-right:1px solid #1e3347 }
+  h1 { font-size:17px; margin:0 0 2px }
+  .sub { color:var(--mute); font-size:12px; margin-bottom:14px }
+  .card { background:#0e1c29; border:1px solid #1e3347; border-radius:8px; padding:12px; margin-bottom:12px }
+  .card h2 { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--mute); margin:0 0 8px }
+  .big { font-size:34px; font-weight:700; color:var(--acc) }
+  .row { display:flex; justify-content:space-between; margin:3px 0 }
+  .row span:first-child { color:var(--mute) }
+  input[type=range] { width:100%; accent-color:var(--acc) }
+  button { background:#17324a; color:var(--ink); border:1px solid #28506f; border-radius:6px; padding:6px 12px; cursor:pointer }
+  button:hover { background:#1d4163 }
+  .badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; background:#1e3347 }
+  .badge.live { background:#0f5132; color:#a7f3d0 } .badge.sample { background:#5a4510; color:#fde68a }
+  #map { height:100% }
+  .ship { width:10px; height:10px; border-radius:50%; border:1px solid #fff; }
+  .leaflet-container { background:#0b1620 }
+  small { color:var(--mute) }
+  @media (max-width:720px){ #app{grid-template-columns:1fr; grid-template-rows:auto 60vh} }
+</style>
+</head>
+<body>
+<div id="app">
+<aside>
+  <h1>Vessel Digital Twin</h1>
+  <div class="sub">USDA Container Vessel Fleet · UAE focus</div>
+
+  <div class="card">
+    <h2>Data source</h2>
+    <span id="src" class="badge sample">loading…</span>
+    <div id="srcNote" style="margin-top:6px"><small></small></div>
+  </div>
+
+  <div class="card">
+    <h2>UAE Brent-linked shipping index</h2>
+    <div class="big" id="idx">100</div>
+    <small>Baseline = 100 at Brent $80, normal activity</small>
+    <div class="row" style="margin-top:8px"><span>Brent crude</span><b id="brentV">$80</b></div>
+    <input id="brent" type="range" min="40" max="150" value="80" />
+    <div class="row"><span>Fuel cost index</span><b id="fuel">100</b></div>
+    <div class="row"><span>Fleet speed factor</span><b id="spd">1.00×</b></div>
+    <div class="row"><span>UAE-bound vessels</span><b id="uaeN">–</b></div>
+    <div class="row"><span>Vessels in twin</span><b id="allN">–</b></div>
+    <div class="row"><span>UAE activity index</span><b id="act">–</b></div>
+  </div>
+
+  <div class="card">
+    <h2>Simulation</h2>
+    <button id="play">Pause</button>
+    <div class="row" style="margin-top:8px"><span>Time speed</span><b id="tsV">1×</b></div>
+    <input id="ts" type="range" min="1" max="20" value="1" />
+    <div class="row"><span>Simulated time</span><b id="clock">–</b></div>
+  </div>
+
+  <div class="card"><small>
+    <b>Index model:</b> Index = 100 × (UAE activity) × (fuel cost ÷ 100)<sup>0.6</sup> ÷ speed factor⁰·⁵.
+    Higher Brent raises bunker cost and triggers slow-steaming (speed ↓). Brent is a manual input (no free keyless oil-price API).
+    Without coordinates in the USDA data, vessel tracks are <i>modelled</i> along real lanes, not observed AIS.
+  </small></div>
+</aside>
+<div id="map"></div>
+</div>
+
+<script src="vendor/leaflet.js"></script>
+<script>
+const DATA_URL = "https://agtransport.usda.gov/resource/n3eq-jw8f.json?$limit=5000";
+const $ = id => document.getElementById(id);
+
+// ---- Ports & lanes (lat, lon) -------------------------------------------------
+const P = {
+  JEBEL_ALI:[25.01,55.06], KHALIFA:[24.80,54.65], FUJAIRAH:[25.17,56.40], HORMUZ:[26.55,56.45],
+  GULF_MID:[26.1,54.2], OMAN_GULF:[24.6,58.8], ARABIAN:[18,62], COLOMBO:[6.9,79.7], SINGAPORE:[1.2,103.8],
+  SHANGHAI:[31.2,122.2], LA:[33.7,-118.3], ROTTERDAM:[51.95,4.1], SUEZ:[29.9,32.55], REDSEA:[20,38.5],
+  BAB:[12.6,43.3], ADEN:[12.2,48.5], MUMBAI:[18.9,72.8], CAPE:[-35,19], HOUSTON:[29.3,-94.7],
+  PANAMA:[9.1,-79.7], NYC:[40.5,-73.9], GIB:[36,-5.5], MALACCA:[3.5,100.5], SALALAH:[16.9,54.0]
+};
+const LANES = [
+  {n:"Shanghai → Jebel Ali",  uae:true,  w:[P.SHANGHAI,[22,118],[10,110],P.SINGAPORE,P.MALACCA,[6,90],P.COLOMBO,[12,68],P.OMAN_GULF,P.HORMUZ,P.GULF_MID,P.JEBEL_ALI], c:"#2dd4bf"},
+  {n:"Rotterdam → Jebel Ali (Suez)", uae:true, w:[P.ROTTERDAM,[48,-6],P.GIB,[36.5,15],[32,30],P.SUEZ,P.REDSEA,P.BAB,P.ADEN,P.ARABIAN,P.OMAN_GULF,P.HORMUZ,P.GULF_MID,P.JEBEL_ALI], c:"#60a5fa"},
+  {n:"Mumbai → Khalifa",      uae:true,  w:[P.MUMBAI,[20,67],P.OMAN_GULF,P.HORMUZ,P.GULF_MID,P.KHALIFA], c:"#a78bfa"},
+  {n:"Fujairah crude → Singapore", uae:true, w:[P.FUJAIRAH,P.OMAN_GULF,P.ARABIAN,P.COLOMBO,P.MALACCA,P.SINGAPORE], c:"#fbbf24"},
+  {n:"Jebel Ali → Houston (Cape)", uae:true, w:[P.JEBEL_ALI,P.GULF_MID,P.HORMUZ,P.OMAN_GULF,[10,55],[-5,48],[-30,35],P.CAPE,[-20,0],[10,-30],[22,-80],P.HOUSTON], c:"#f472b6"},
+  {n:"Shanghai → Los Angeles",uae:false, w:[P.SHANGHAI,[35,150],[45,-170],P.LA], c:"#64748b"},
+  {n:"Shanghai → Rotterdam (Suez)", uae:false, w:[P.SHANGHAI,P.SINGAPORE,P.MALACCA,P.COLOMBO,[12,60],P.ADEN,P.BAB,P.REDSEA,P.SUEZ,[32,30],[36.5,15],P.GIB,[48,-6],P.ROTTERDAM], c:"#64748b"},
+  {n:"Rotterdam → New York",  uae:false, w:[P.ROTTERDAM,[49,-6],[46,-40],P.NYC], c:"#64748b"},
+  {n:"Los Angeles → Panama → NYC", uae:false, w:[P.LA,[15,-100],P.PANAMA,[20,-75],P.NYC], c:"#64748b"},
+];
+
+// ---- Geometry helpers ---------------------------------------------------------
+const hav=(a,b)=>{const R=6371,r=Math.PI/180,dl=(b[0]-a[0])*r,dn=(b[1]-a[1])*r;
+  const x=Math.sin(dl/2)**2+Math.cos(a[0]*r)*Math.cos(b[0]*r)*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(x));};
+LANES.forEach(l=>{l.cum=[0];for(let i=1;i<l.w.length;i++)l.cum.push(l.cum[i-1]+hav(l.w[i-1],l.w[i]));l.len=l.cum[l.cum.length-1];});
+function posOn(l,d){ // d km along lane
+  d=Math.max(0,Math.min(l.len,d));let i=1;while(i<l.cum.length-1&&l.cum[i]<d)i++;
+  const t=(d-l.cum[i-1])/((l.cum[i]-l.cum[i-1])||1),a=l.w[i-1],b=l.w[i];
+  return [a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];
+}
+
+// ---- Map ----------------------------------------------------------------------
+const map=L.map("map",{worldCopyJump:true,minZoom:2}).setView([22,60],3);
+L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+  {attribution:"© OpenStreetMap · © CARTO",maxZoom:10}).addTo(map);
+LANES.forEach(l=>L.polyline(l.w,{color:l.c,weight:l.uae?1.5:1,opacity:l.uae?.5:.25,dashArray:"4 6"}).addTo(map).bindTooltip(l.n,{sticky:true}));
+[["Jebel Ali",P.JEBEL_ALI],["Khalifa",P.KHALIFA],["Fujairah",P.FUJAIRAH]].forEach(([n,p])=>
+  L.circleMarker(p,{radius:6,color:"#fff",fillColor:"#2dd4bf",fillOpacity:1,weight:2}).addTo(map).bindTooltip(n+" (UAE)",{permanent:p===P.JEBEL_ALI,direction:"left"}));
+
+// ---- Fleet twin ---------------------------------------------------------------
+const KM_PER_SIM_HOUR = 30; // ~16 knots base
+let vessels=[], fleetScale=1, dataVessels=[];
+function buildFleet(total){
+  vessels.forEach(v=>v.m.remove()); vessels=[];
+  const uaeLanes=LANES.filter(l=>l.uae), other=LANES.filter(l=>!l.uae);
+  const nUae=Math.round(total*0.45);
+  for(let i=0;i<total;i++){
+    const l=i<nUae?uaeLanes[i%uaeLanes.length]:other[i%other.length];
+    const dir=(i%2)?1:-1;
+    const v={lane:l,dir,d:Math.random()*l.len,base:0.8+Math.random()*0.4,
+      name:(dataVessels[i]&&dataVessels[i].name)||`Vessel ${String(i+1).padStart(3,"0")}`,
+      teu:(dataVessels[i]&&dataVessels[i].teu)||Math.round(3000+Math.random()*21000)};
+    v.m=L.circleMarker(posOn(l,v.d),{radius:l.uae?4:3,color:"#fff",weight:1,fillColor:l.c,fillOpacity:.95}).addTo(map);
+    v.m.bindTooltip(()=>`${v.name}<br>${v.lane.n}<br>${v.teu.toLocaleString()} TEU`);
+    vessels.push(v);
+  }
+}
+
+// ---- Index --------------------------------------------------------------------
+function brent(){return +$("brent").value}
+function speedFactor(){return Math.max(.7,Math.min(1.1,1-.2*(brent()/80-1)))}
+function fuelIdx(){return brent()/80*100}
+function updateIdx(){
+  const uae=vessels.filter(v=>v.lane.uae).length, all=vessels.length||1;
+  // activity: UAE share relative to a 45% baseline
+  const act=100*(uae/all)/.45;
+  const idx=act*Math.pow(fuelIdx()/100,.6)/Math.pow(speedFactor(),.5);
+  $("idx").textContent=idx.toFixed(0);
+  $("brentV").textContent="$"+brent(); $("fuel").textContent=fuelIdx().toFixed(0);
+  $("spd").textContent=speedFactor().toFixed(2)+"×"; $("uaeN").textContent=uae; $("allN").textContent=all;
+  $("act").textContent=act.toFixed(0);
+  $("idx").style.color=idx>110?"var(--warn)":idx<90?"var(--bad)":"var(--acc)";
+}
+$("brent").oninput=updateIdx;
+$("ts").oninput=()=>$("tsV").textContent=$("ts").value+"×";
+
+// ---- Loop ---------------------------------------------------------------------
+let playing=true,last=performance.now(),simT=Date.now();
+$("play").onclick=()=>{playing=!playing;$("play").textContent=playing?"Pause":"Play"};
+function frame(now){
+  const dt=(now-last)/1000;last=now;
+  if(playing){
+    const simHours=dt*$("ts").value*2; // 1 real sec = 2 sim hours at 1×
+    simT+=simHours*3600e3;
+    for(const v of vessels){
+      v.d+=v.dir*KM_PER_SIM_HOUR*simHours*v.base*speedFactor();
+      if(v.d>v.lane.len){v.d=v.lane.len;v.dir=-1}else if(v.d<0){v.d=0;v.dir=1}
+      v.m.setLatLng(posOn(v.lane,v.d));
+    }
+    $("clock").textContent=new Date(simT).toISOString().slice(0,16).replace("T"," ")+" UTC";
+  }
+  requestAnimationFrame(frame);
+}
+
+// ---- USDA data ----------------------------------------------------------------
+function pick(row,re){return Object.keys(row).find(k=>re.test(k))}
+function num(x){const n=parseFloat(String(x).replace(/,/g,""));return isFinite(n)?n:NaN}
+async function loadData(){
+  const note=$("srcNote").firstElementChild;
+  try{
+    const r=await fetch(DATA_URL,{headers:{Accept:"application/json"}});
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const rows=await r.json();
+    if(!Array.isArray(rows)||!rows.length)throw new Error("empty dataset");
+    const f=rows[0], cap=pick(f,/teu|capacity|deadweight|dwt/i), nm=pick(f,/vessel|ship|name/i),
+          la=pick(f,/^lat/i), lo=pick(f,/^(lon|lng)/i);
+    dataVessels=rows.map(r=>({name:nm?r[nm]:null,teu:cap&&isFinite(num(r[cap]))?Math.round(num(r[cap])):null}));
+    const total=Math.max(40,Math.min(300,rows.length));
+    $("src").textContent="USDA live"; $("src").className="badge live";
+    note.textContent=`${rows.length} rows loaded (${Object.keys(f).length} columns). `+
+      (la&&lo?"Coordinates found in data; lanes still used for animation. ":"No coordinates in data: fleet size/capacity drive the twin; routes are modelled. ")+
+      (cap?`Capacity column: ${cap}.`:"");
+    buildFleet(total);
+  }catch(e){
+    $("src").textContent="sample data"; $("src").className="badge sample";
+    note.textContent=`Could not load USDA API (${e.message}). Showing a modelled sample fleet of 120 vessels.`;
+    buildFleet(120);
+  }
+  updateIdx();
+}
+loadData();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
