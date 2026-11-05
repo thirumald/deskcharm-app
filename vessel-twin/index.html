@@ -117,8 +117,12 @@ function posOn(l,d){ // d km along lane
 
 // ---- Map ----------------------------------------------------------------------
 const map=L.map("map",{worldCopyJump:true,minZoom:2}).setView([22,60],3);
-L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-  {attribution:"© OpenStreetMap · © CARTO",maxZoom:10}).addTo(map);
+const dark=L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+  {attribution:"© OpenStreetMap · © CARTO",maxZoom:10});
+const osm=L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+  {attribution:"© OpenStreetMap contributors",maxZoom:19});
+dark.addTo(map);
+L.control.layers({"CARTO Dark":dark,"OpenStreetMap":osm},null,{position:"topright"}).addTo(map);
 LANES.forEach(l=>L.polyline(l.w,{color:l.c,weight:l.uae?1.5:1,opacity:l.uae?.5:.25,dashArray:"4 6"}).addTo(map).bindTooltip(l.n,{sticky:true}));
 [["Jebel Ali",P.JEBEL_ALI],["Khalifa",P.KHALIFA],["Fujairah",P.FUJAIRAH]].forEach(([n,p])=>
   L.circleMarker(p,{radius:6,color:"#fff",fillColor:"#2dd4bf",fillOpacity:1,weight:2}).addTo(map).bindTooltip(n+" (UAE)",{permanent:p===P.JEBEL_ALI,direction:"left"}));
